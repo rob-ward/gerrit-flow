@@ -1,0 +1,116 @@
+Certain details such as the server are taken from a config file if present, this is described at the botom
+
+start ISSUEID  <origin point>
+	origin point is a branch or commit id
+	
+	creates branch called ISSUEID
+
+	defaults to whatever is in config file, or master
+	
+	localconfig adds gerrit.ISSUEID.startpoint = <origin point>
+	
+	origin point needs to be a brnach on the gerrit server
+	
+	
+draft
+
+	creates brnach called ISSUEID.draft from gerrit.ISSUEID.startpoint
+	
+	performs squash merge of branch ISSUEID
+	
+	If merge fails report to user revert to ISSUEID branch and delete ISSUEID.draft
+	
+	Checks if a commit with the sha sum of ISSUEID exists on gerrit server, 
+		if it does it bringss the commit message down and uses that
+		
+		if not it creates a message following Template
+		
+		push to <server>/drafts/<gerrit.ISSUEID.startpoint>
+		
+		
+push
+
+	creates brnach called ISSUEID.review from gerrit.ISSUEID.startpoint
+	
+	performs squash merge of branch ISSUEID
+	
+	If merge fails report to user revert to ISSUEID branch and delete ISSUEID.draft
+	
+	Checks if a commit with the sha sum of ISSUEID exists on gerrit server, 
+		if it does it bringss the commit message down and uses that
+		
+		if not it creates a message following Template
+		
+		push to <server>/for/<gerrit.ISSUEID.startpoint>
+		
+
+rework ISSUEID
+
+	Check if branch called ISSUEID already exists, if so tell user to 
+	either delete or merge changes in
+	
+	Create branch called ISSUEID based on Gerrit.startpoint obtained from
+	commit message
+	
+	Merge changes in.
+	
+	Set gerrit.ISSUEID.startpoint = Gerrit.startpoint
+	
+	Checkout branch	
+	
+suck ISSUEID
+	Check if branch called ISSUEID.suck already exists, if so ask user if they want to delete
+	
+	Create branch called ISSUEID.suck based on Gerrit.startpoint obtained from
+	commit message
+	
+	Merge changes in.
+	
+	Checkout branch	
+	
+	Print message telling use that this is not a brnach to do work with
+	
+
+review <type>
+	types can be, summary, web, patch and tool
+	defaults to web
+	
+
+
+
+	
+	
+
+
+
+
+
+		
+		
+
+
+TEMPLATE:
+
+<ISSUEID> - #INSERT YOU SUMMARY
+
+#Below descript the changes and the reason for them
+Description:
+
+#Below describe how to test the change
+Test Procedure:
+
+#Do not edit any point below here
+#########
+
+Gerrit.startpoint: <VALUE OF gerrit.ISSUEID.startpoint>
+
+Change-Id: I<SHA of ISSUEID>
+
+
+
+
+
+
+
+		
+
