@@ -1,6 +1,6 @@
 Certain details such as the server are taken from a config file if present, this is described at the botom
 
-start ISSUEID  <origin point>
+
 	origin point is a branch or commit id
 	
 	creates branch called ISSUEID
