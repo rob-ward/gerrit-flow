@@ -1,8 +1,9 @@
-import sys,logging,os
+#! /usr/bin/env python
+
+import sys, logging, os, subprocess, hashlib
 from git import *
 
-issueid = ""
-startpoint = ""
+
 
 def usage():
 	print "the following commands are valid:"
@@ -11,14 +12,14 @@ def usage():
 def create_remote(repo):
 	exists = False
 	
-	gerrit_remote = repo.remote("gerrit_upstream_remote")
 	
 	for r in repo.remotes:
 		if r.name == "gerrit_upstream_remote":
 			exists = True
 	
 	if exists == False:
-		repo.create_remote('gerrit_upstream_remote', 'git@github.com:rob-ward/gerrit-flow.git')
+		origin_url = subprocess.check_output(["git", "config", "--get", "remote.origin.url"]).rstrip()
+		repo.create_remote('gerrit_upstream_remote', origin_url)
 
 	repo.remote("gerrit_upstream_remote").fetch() 
 	
@@ -40,11 +41,11 @@ def branch_exist_remote(bname, repo, remote):
 	
 	return found;
 	
-def branch_exist(bname, repo,remote):
+def branch_exist(bname, repo, remote):
 	
 	found = branch_exist_local(bname, repo)
 	
-	if found !=  True:
+	if found != True:
 		branch_exist_remote(bname, repo, remote)
 		
 	return found
@@ -59,29 +60,36 @@ def write_config(repo, issueid, key, value):
 	
 	writer.set(sectionname, key, value)
 	
+def read_config(repo, issueid, key):
+	reader = repo.config_reader("repository")
+	
+	sectionname = 'gerrit-flow "' + issueid + '"'
+	
+	value = reader.get(sectionname, key)
+	
+	return value
 	
 def checkout(repo, bname):
-	found = False
+# need to check if there are modified files, if there are fail
 	for b in repo.branches:
 		if str(b) == bname:
 			b.checkout()
-			return
-
-
-	
+			return True
+		
+	return False
 
 def do_start(argv):
 
-	#start ISSUEID  <origin point>	
+	# start ISSUEID  <origin point>	
 	logging.warning("entering :" + str(argv))
 	
 	
 	if len(argv) < 3 or len(argv) > 4:
-		#not a valid star command
+		# not a valid star command
 		print "Invalid command - usage is as follows"
 		usage()
 	else:
-		issueid=argv[2]
+		issueid = argv[2]
 		
 		global startpoint
 		
@@ -99,7 +107,7 @@ def do_start(argv):
 			if branch_exist(issueid, repo, remote) == False:
 				repo.git.branch(issueid, 'gerrit_upstream_remote/' + startpoint)
 				if branch_exist_local(issueid, repo) == True:
-					#creation of branch was succesful
+					# creation of branch was succesful
 				
 					write_config(repo, issueid, "startpoint" , startpoint)
 					
@@ -109,21 +117,95 @@ def do_start(argv):
 				print " A local branch called " + issueid + " exists!. As such we cannot start a new instance for this issue."
 	
 		
+def submit(repo, ref, append):
+	remote = create_remote(repo)
 		
+	issueid = repo.active_branch
 		
+	print issueid
+	startpoint = read_config(repo, issueid.name, "startpoint")
 		
+	# Check that the branch doesn't exist, then create it
+	if branch_exist(issueid.name + append, repo, remote) == True:
+		print "PANIC Stations:\n\tThe branch for this change commit already exists, this\n\tlikely means that a" + \
+			" previous draft upload\n\tfailed, the branch called " + issueid.name + append + \
+			" must be\n\tremoved before you can continue."
+	else:
+			retval = repo.git.branch(issueid.name + append, 'gerrit_upstream_remote/' + startpoint)
+			print retval
+			retval = checkout(repo, issueid.name + append)
+			print retval
+			try:
+				retval = repo.git.merge("--squash", "--no-commit", issueid)
+			except:
+				print "Oh Dear:\n\tThe merge into the latest tip of " + startpoint + " failed." + \
+						"\n\tThe likely hood is that you need to merge in the latest changes in " + startpoint + \
+						"\n\tinto your branch"
+				repo.git.reset("--hard", "HEAD")
+				issueid.checkout()
+				repo.git.branch("-D", issueid.name + append)
+				return
 		
-		
+			commithash = hashlib.new('ripemd160')
+			commithash.update(issueid.name)
+			commitmessage = issueid.name + " - \n# Brief summary on line above(<50 chars)\n\n" + \
+				"# Describe in detail the change below\nChange-Description:\n\n\n# Describe how to test your change below\n" + \
+				 "Change-TestProcedure:\n\n\n# DO NOT EDIT ANYTHING BELOW HERE\n\nGerrit.startpoint:" + startpoint + \
+				 "\n\nChange-Id:I" + commithash.hexdigest()
+			f = open(issueid.name + '_commitmessage', 'w')
+			f.write(commitmessage)
+			f.close()
+							
+				
+			subprocess.call(['vim', issueid.name + '_commitmessage'])
+			commitmessage = "" 
 			
-
+			f = file(issueid.name + '_commitmessage', "r")
+			for line in f:
+				if not line.startswith("#"):
+					commitmessage = commitmessage + line
+	
+			
+			repo.git.commit("-a", '-m', commitmessage)
+			try:
+				retval = subprocess.check_output(["git", "push", "gerrit_upstream_remote", ref + startpoint], stderr=subprocess.STDOUT)
+			except subprocess.CalledProcessError as e:
+				retval = e.output
+			
+			print "ret = "
+			print retval.find("(no changes made)")
+			if retval.find("(no changes made)") >= 0:
+				print "Oh Dear: \n\tYou don't seem to have commited any changes, make\n\tsure you have saved your files, and committed them!!"
+			
+			issueid.checkout()
+			repo.git.branch("-D", issueid.name + append)
+				
 
 def do_draft(argv):
-	logging.debug("entering")
 	print 'Argument List start :', str(argv)
+	if len(argv) != 2:
+		# not a valid star command
+		print "Invalid command - usage is as follows"
+		usage()
+	else:
+		repo = Repo(os.getcwd())
+		submit(repo, "HEAD:refs/drafts/", "_draft")
+		
+		
+		
+	
 	
 def do_push(argv):
-	logging.debug("entering")
 	print 'Argument List start :', str(argv)
+	if len(argv) != 2:
+		# not a valid star command
+		print "Invalid command - usage is as follows"
+		usage()
+	else:
+		repo = Repo(os.getcwd())
+		submit(repo, "HEAD:refs/for/", "_push")
+		
+		
 	
 def do_rework(argv):
 	logging.debug("entering")
@@ -135,7 +217,7 @@ def do_suck(argv):
 
 def do_review(argv):
 	logging.debug("entering")
-	print 'Argument List ',  str(argv)
+	print 'Argument List ', str(argv)
 
 dispatch = {
 	'start': 	do_start,
@@ -150,6 +232,8 @@ dispatch = {
 
 def main():
 
+	print os.getcwd()
+	
 
 	print 'Number of arguments:', len(sys.argv), 'arguments.'
 
@@ -161,5 +245,5 @@ def main():
 
 
 if __name__ == "__main__":
-	logging.basicConfig(format="%(asctime)s: - %(filename)s: - %(funcName)s:%(message)s",level=logging.DEBUG,stream=sys.stdout)
+	logging.basicConfig(format="%(asctime)s: - %(filename)s: - %(funcName)s:%(message)s", level=logging.DEBUG, stream=sys.stdout)
 	main()

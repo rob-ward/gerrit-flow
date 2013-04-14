@@ -30,7 +30,7 @@ draft
 		
 push
 
-	creates brnach called ISSUEID.review from gerrit.ISSUEID.startpoint
+	creates brnach called ISSUEID.push from gerrit.ISSUEID.startpoint
 	
 	performs squash merge of branch ISSUEID
 	
