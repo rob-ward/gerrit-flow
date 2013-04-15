@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import sys, logging, os, subprocess, hashlib
+import sys, logging, os, subprocess, hashlib, json
 from git import *
 
 
@@ -8,6 +8,25 @@ from git import *
 def usage():
 	print "the following commands are valid:"
 
+def get_origin_url():
+	origin_url = subprocess.check_output(["git", "config", "--get", "remote.origin.url"]).rstrip()
+	return origin_url
+
+def get_server_hostname(url):
+	start = url.find("@")
+	url = url[start + 1:]
+	end = url.find(":")
+	hostname = url[:end]
+	return hostname
+
+def get_server_port(url):
+	start = url.find(":")
+	url = url[start + 1:]
+	start = url.find(":")
+	url = url[start + 1:]
+	end = url.find("/")
+	port = url[:end]
+	return port
 
 def create_remote(repo):
 	exists = False
@@ -18,7 +37,7 @@ def create_remote(repo):
 			exists = True
 	
 	if exists == False:
-		origin_url = subprocess.check_output(["git", "config", "--get", "remote.origin.url"]).rstrip()
+		origin_url = get_origin_url()
 		repo.create_remote('gerrit_upstream_remote', origin_url)
 
 	repo.remote("gerrit_upstream_remote").fetch() 
@@ -148,10 +167,33 @@ def submit(repo, ref, append):
 		
 			commithash = hashlib.new('ripemd160')
 			commithash.update(issueid.name)
-			commitmessage = issueid.name + " - \n# Brief summary on line above(<50 chars)\n\n" + \
-				"# Describe in detail the change below\nChange-Description:\n\n\n# Describe how to test your change below\n" + \
-				 "Change-TestProcedure:\n\n\n# DO NOT EDIT ANYTHING BELOW HERE\n\nGerrit.startpoint:" + startpoint + \
-				 "\n\nChange-Id:I" + commithash.hexdigest()
+			
+			url = get_origin_url()
+			hostname = get_server_hostname(url)
+			port = get_server_port(url)
+			
+			print "url = " + url + "    host =" + hostname + "    port = " + port
+
+			
+			
+			commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "change:I" + commithash.hexdigest() ])
+			if commitmessage.find("rowCount: 0") >= 0:
+				# we don't have so a commit message
+				commitmessage = issueid.name + " - \n# Brief summary on line above(<50 chars)\n\n" + \
+					"# Describe in detail the change below\nChange-Description:\n\n\n# Describe how to test your change below\n" + \
+				 	"Change-TestProcedure:\n\n\n# DO NOT EDIT ANYTHING BELOW HERE\n\nGerrit.startpoint:" + startpoint + \
+				 	"\n\nChange-Id:I" + commithash.hexdigest()
+			else:
+				# we have a commit message be we have to paarse if from json
+				print commitmessage
+				start = commitmessage.find(',"commitMessage":"')
+				start = start + 18
+				
+				end = commitmessage.find('","createdOn":')
+				commitmessage = commitmessage[start:end].replace("\\n", "\n")
+				print commitmessage
+				commitmessage = commitmessage.replace("Gerrit.startpoint:", "# DO NOT EDIT ANYTHING BELOW HERE\n\nGerrit.startpoint:")
+								
 			f = open(issueid.name + '_commitmessage', 'w')
 			f.write(commitmessage)
 			f.close()
