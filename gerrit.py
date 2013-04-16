@@ -107,35 +107,42 @@ def do_start(argv):
 		# not a valid star command
 		print "Invalid command - usage is as follows"
 		usage()
+		return
+	
+	repo = Repo(os.getcwd())
+	
+	if repo.is_dirty() == True:
+		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		return
+	
+	issueid = argv[2]
+		
+	global startpoint
+		
+	if len(argv) == 4:
+		startpoint = argv[3]
 	else:
-		issueid = argv[2]
-		
-		global startpoint
-		
-		if len(argv) == 4:
-			startpoint = argv[3]
-		else:
-			startpoint = "master"
+		startpoint = "master"
+
 	
-		repo = Repo(os.getcwd())
-		remote = create_remote(repo)
-		
-		if branch_exist_remote(startpoint, repo, remote) == False:
-			print "The requested startpoint cannot be found on the gerrit server, you must specify a branch which exists upstream(where you changes will be merged back onto)"
-		else:
-			if branch_exist(issueid, repo, remote) == False:
-				repo.git.branch(issueid, 'gerrit_upstream_remote/' + startpoint)
-				if branch_exist_local(issueid, repo) == True:
-					# creation of branch was succesful
+	remote = create_remote(repo)
+	
+	if branch_exist_remote(startpoint, repo, remote) == False:
+		print "The requested startpoint cannot be found on the gerrit server, you must specify a branch which exists upstream(where you changes will be merged back onto)"
+	else:
+		if branch_exist(issueid, repo, remote) == False:
+			repo.git.branch(issueid, 'gerrit_upstream_remote/' + startpoint)
+			if branch_exist_local(issueid, repo) == True:
+				# creation of branch was succesful
+			
+				write_config(repo, issueid, "startpoint" , startpoint)
 				
-					write_config(repo, issueid, "startpoint" , startpoint)
-					
-					checkout(repo, issueid)
+				checkout(repo, issueid)
+
+		else:
+			print " A local branch called " + issueid + " exists!. As such we cannot start a new instance for this issue."
+
 	
-			else:
-				print " A local branch called " + issueid + " exists!. As such we cannot start a new instance for this issue."
-	
-		
 def submit(repo, ref, append):
 	remote = create_remote(repo)
 		
@@ -172,12 +179,8 @@ def submit(repo, ref, append):
 			hostname = get_server_hostname(url)
 			port = get_server_port(url)
 			
-			print "url = " + url + "    host =" + hostname + "    port = " + port
-
-			
-			
 			commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "change:I" + commithash.hexdigest() ])
-			if commitmessage.find("rowCount: 0") >= 0:
+			if commitmessage.find('"rowCount":0') >= 0:
 				# we don't have so a commit message
 				commitmessage = issueid.name + " - \n# Brief summary on line above(<50 chars)\n\n" + \
 					"# Describe in detail the change below\nChange-Description:\n\n\n# Describe how to test your change below\n" + \
@@ -229,9 +232,15 @@ def do_draft(argv):
 		# not a valid star command
 		print "Invalid command - usage is as follows"
 		usage()
-	else:
-		repo = Repo(os.getcwd())
-		submit(repo, "HEAD:refs/drafts/", "_draft")
+		return
+	
+	repo = Repo(os.getcwd())
+	if repo.is_dirty() == True:
+		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		return
+	
+	repo = Repo(os.getcwd())
+	submit(repo, "HEAD:refs/drafts/", "_draft")
 		
 		
 		
@@ -243,19 +252,132 @@ def do_push(argv):
 		# not a valid star command
 		print "Invalid command - usage is as follows"
 		usage()
-	else:
-		repo = Repo(os.getcwd())
-		submit(repo, "HEAD:refs/for/", "_push")
-		
-		
+		return
 	
+	repo = Repo(os.getcwd())
+	if repo.is_dirty() == True:
+		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		return
+
+	submit(repo, "HEAD:refs/for/", "_push")
+		
+		
+def clone_ref(issue_name, repo):
+	print "clone_ref - " + issue_name
+	commithash = hashlib.new('ripemd160')
+	commithash.update(issue_name)
+	
+	url = get_origin_url()
+	hostname = get_server_hostname(url)
+	port = get_server_port(url)
+			
+	commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--current-patch-set", "change:I" + commithash.hexdigest() ])
+	if commitmessage.find('"rowCount":0') >= 0:
+		# we don't have so a commit message
+		print "Oh Dear:\n\tThe issue name you provided doesn't seem to exist on\n\tthe server(" + hostname + "), check you know how to type and\n\tthe change is on the server."
+		return ""
+	else:
+		create_remote(repo)
+		start = commitmessage.find('"ref":"')
+		start = start + 7
+		end = commitmessage.find('","uploader"')
+		ref = commitmessage[start:end]
+		print ref
+		repo.git.fetch("gerrit_upstream_remote", ref)
+		repo.git.checkout("FETCH_HEAD")
+		return ref
+
 def do_rework(argv):
-	logging.debug("entering")
-	print 'Argument List start :', str(argv)
+	if len(argv) < 3 or len(argv) > 4 :
+		# not a valid star command
+		print "Invalid command - usage is as follows"
+		usage()
+		return
+	
+	repo = Repo(os.getcwd())
+	if repo.is_dirty() == True:
+		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		return
+	
+	issue_name = argv[2]
+	mergechanges = False
+	if len(argv) == 4:
+		if argv[3] == "merge":
+			mergechanges = True
+		
+	ref = clone_ref(issue_name, repo)
+	if ref != "":
+		# we have a ref
+		if branch_exist_local(issue_name, repo) == False:
+			if mergechanges == False:
+				repo.git.checkout("-b", issue_name)
+				commithash = hashlib.new('ripemd160')
+				commithash.update(issue_name)
+	
+				url = get_origin_url()
+				hostname = get_server_hostname(url)
+				port = get_server_port(url)
+			
+				commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "change:I" + commithash.hexdigest() ])
+				
+				print "commitmesage1 =" + commitmessage
+				start = commitmessage.find(',"commitMessage":"')
+				start = start + 18
+				
+				
+				end = commitmessage.find('","createdOn":')
+				commitmessage = commitmessage[start:end].replace("\\n", "\n")
+				startpoint = "master"
+				for line in commitmessage.split('\n'):
+					if line.find("Gerrit.startpoint:") != -1:
+						startpoint = line.split(':')[1]
+
+				write_config(repo, issue_name, "startpoint" , startpoint)
+			else:
+				print "Oh Dear: You have requested a merge but the branch doesn't currently exist locally."
+		else:
+			# brnach exists
+			if mergechanges == False:
+				print "Oh Dear:\n\tIt appears that the creation of the new branch " + issue_name + " can't \n\thappen" + \
+				"due to a branch with this name already existing. If you want to" + \
+				"\n\tmerge the changes onto that branch then run git gerrit rework ISSUEID merge" + \
+				"\n\tPlease remove this branch and try again!"
+			else:
+				repo.git.checkout(issue_name)
+				try:
+					repo.git.pull("gerrit_upstream_remote", ref)
+				except GitCommandError as e:
+					if e.status == 1:
+						print "Oh Dear:\n\tIt appears that the automerge failed, please use\n\t git mergetool to complete the action and then perform a commit"
+							
+				
+			
+				
 	
 def do_suck(argv):
-	logging.debug("entering")
-	print 'Argument List start :', str(argv)
+	if len(argv) != 3 :
+		# not a valid star command
+		print "Invalid command - usage is as follows"
+		usage()
+		return
+	
+	repo = Repo(os.getcwd())
+	if repo.is_dirty() == True:
+		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		return
+	
+	issue_name = argv[2]
+	if branch_exist_local(issue_name, repo) == False:
+		clone_ref(issue_name, repo,)
+		try:
+			repo.git.checkout("-b", issue_name + "_suck")
+		except:
+			print "Oh Dear:\n\tIt appears that the creation of the new branch " + issue_name + "_suck has\n\tfailed. Please check you git repo and try again."
+	else:
+		print "Oh Dear:\n\tIt appears that the creation of the new branch " + issue_name + "_suck can't \n\thappen" + \
+				"due to a branch with this name already existing. If you want to" + \
+				"\n\tmerge the changes onto that branch then run git gerrit rework ISSUEID merge" + \
+				"\n\tPlease remove this branch and try again!"
 
 def do_review(argv):
 	logging.debug("entering")
@@ -268,7 +390,6 @@ dispatch = {
 	'rework': 	do_rework,
 	'suck': 	do_suck,
 	'review': 	do_review,
-		
 }
 
 
