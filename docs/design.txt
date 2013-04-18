@@ -107,6 +107,28 @@ Gerrit.startpoint: <VALUE OF gerrit.ISSUEID.startpoint>
 Change-Id: I<SHA of ISSUEID>
 
 
+####################
+
+Summary output format;
+
+Project:
+Branch:
+
+Owner:
+
+URI:
+
+Issue Commit Message:
+
+Created On:
+
+Last Updated On;
+
+Number of patchsets:
+
+	
+
+
 
 
 

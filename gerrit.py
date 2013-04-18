@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import sys, logging, os, subprocess, hashlib, json
+import sys, logging, os, subprocess, hashlib, json, datetime, webbrowser
 from git import *
 
 
@@ -311,6 +311,11 @@ def do_rework(argv):
 		if branch_exist_local(issue_name, repo) == False:
 			if mergechanges == False:
 				repo.git.checkout("-b", issue_name)
+				if(repo.active_branch.name != issue_name):
+					print "Oh Dear:\n\tCheckout of the new branch failed. Please clean the git repo and try again!"
+				else:
+					print "You are now on branch " + issue_name
+					
 				commithash = hashlib.new('ripemd160')
 				commithash.update(issue_name)
 	
@@ -338,12 +343,17 @@ def do_rework(argv):
 		else:
 			# brnach exists
 			if mergechanges == False:
-				print "Oh Dear:\n\tIt appears that the creation of the new branch " + issue_name + " can't \n\thappen" + \
+				print "Oh Dear:\n\tIt appears that the creation of the new branch " + issue_name + " can't \n\thappen " + \
 				"due to a branch with this name already existing. If you want to" + \
 				"\n\tmerge the changes onto that branch then run git gerrit rework ISSUEID merge" + \
 				"\n\tPlease remove this branch and try again!"
 			else:
 				repo.git.checkout(issue_name)
+				if(repo.active_branch.name != issue_name):
+					print "Oh Dear:\n\tCheckout of the existing branch failed, please check that you have a clean git repo"
+				else:
+					print "You are now on branch " + issue_name
+					
 				try:
 					repo.git.pull("gerrit_upstream_remote", ref)
 				except GitCommandError as e:
@@ -379,17 +389,147 @@ def do_suck(argv):
 				"\n\tmerge the changes onto that branch then run git gerrit rework ISSUEID merge" + \
 				"\n\tPlease remove this branch and try again!"
 
+def review_summary(issue_name):
+	url = get_origin_url()
+	hostname = get_server_hostname(url)
+	port = get_server_port(url)
+				
+	commithash = hashlib.new('ripemd160')
+	commithash.update(issue_name)
+				
+	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "--current-patch-set", "change:I" + commithash.hexdigest() ])
+	# info.replace("id: I", "Change ID: I")
+	decoded = json.loads(info.splitlines()[0])
+	
+	project = decoded['project']
+	branch = decoded['branch']
+	owner = decoded['owner']['name']
+	owner_email = decoded['owner']['email']
+	status = decoded['status']
+	created = datetime.datetime.fromtimestamp(decoded['createdOn']).strftime('%d-%m-%Y %H:%M:%S')
+	updated = datetime.datetime.fromtimestamp(decoded['lastUpdated']).strftime('%d-%m-%Y %H:%M:%S')
+	commitmessage = decoded['commitMessage']
+	numberofpatches = decoded['currentPatchSet']['number']
+	uri = decoded['url']
+	
+	
+	print "Project : " + project
+	print "Branch : " + branch
+	print "Change Owner : " + owner + " - " + owner_email
+	print "\nStatus : " + status
+	print "\nCreated on : " + created
+	print "Updated On : " + updated
+	print "Commit message: "
+	for l in commitmessage.splitlines():
+		print "\t\t" + l
+	
+	print "\nNumber of Patchsets : " + str(numberofpatches)
+	print "Change URI : " + uri
+	
+def review_web(issue_name):
+	url = get_origin_url()
+	hostname = get_server_hostname(url)
+	port = get_server_port(url)
+				
+	commithash = hashlib.new('ripemd160')
+	commithash.update(issue_name)
+				
+	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "--current-patch-set", "change:I" + commithash.hexdigest() ])
+	decoded = json.loads(info.splitlines()[0])
+	uri = decoded['url']
+	try:
+		webbrowser.open(uri)
+	except:
+		print "Oh Dear:\n\tIt appears that we can't open a browser or that the uri we have is invalid. Try visiting: " + uri
+
+def review_patch(issue_name):
+	repo = Repo(os.getcwd())
+
+	url = get_origin_url()
+	hostname = get_server_hostname(url)
+	port = get_server_port(url)
+				
+	commithash = hashlib.new('ripemd160')
+	commithash.update(issue_name)
+				
+	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--current-patch-set", "change:I" + commithash.hexdigest() ])
+	decoded = json.loads(info.splitlines()[0])
+	
+	ref = decoded['currentPatchSet']['ref']
+	repo.git.fetch(url, ref)
+	patch = subprocess.check_output(['git', "format-patch", "-1", "--stdout", "FETCH_HEAD" ])
+	print patch
+	
+
+
+
+def review_tool(issue_name):
+	print "review_tool"
+	
+summary_type = {
+	'web': 		review_web,
+	'summary':	review_summary,
+	'patch': 	review_patch,
+	'tool': 	review_tool,
+}
+
+
 def do_review(argv):
-	logging.debug("entering")
-	print 'Argument List ', str(argv)
+	if len(argv) < 3 or len(argv) > 4 :
+		# not a valid star command
+		print "Invalid command - usage is as follows"
+		usage()
+		return
+	
+	stype = "web"
+	
+	issue_name = argv[2]
+	if len(argv) == 4:
+		stype = argv[3]
+		
+	if stype in summary_type:
+		summary_type[stype](issue_name)
+	else:
+		print "Oh Dear:\n\tThis is not a valid review type. Check for a type!! \n\n\tIf you would like a new type adding let us know!"
+
+def do_cherrypick(argv):
+	repo = Repo(os.getcwd())
+	if repo.is_dirty() == True:
+		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		return
+	
+	if len(argv) != 3:
+		print "Oh Dear:\n\tCherrypick only supports a command with a issue name after it, please try again!"
+		return
+	
+	issue_name = argv[2]
+	
+	url = get_origin_url()
+	hostname = get_server_hostname(url)
+	port = get_server_port(url)
+				
+	commithash = hashlib.new('ripemd160')
+	commithash.update(issue_name)
+				
+	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--current-patch-set", "change:I" + commithash.hexdigest() ])
+	decoded = json.loads(info.splitlines()[0])
+	
+	ref = decoded['currentPatchSet']['ref']
+	repo.git.fetch(url, ref)
+	repo.git.cherry_pick("FETCH_HEAD")
+	
+	
+
 
 dispatch = {
-	'start': 	do_start,
-	'draft':	do_draft,
-	'push': 	do_push,
-	'rework': 	do_rework,
-	'suck': 	do_suck,
-	'review': 	do_review,
+	'start': 		do_start,
+	'draft':		do_draft,
+	'push': 		do_push,
+	'rework': 		do_rework,
+	'suck': 		do_suck,
+	'review': 		do_review,
+	'cherrypick': 	do_cherrypick,
+	'cherry-pick': 	do_cherrypick,
 }
 
 
