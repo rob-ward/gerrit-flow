@@ -1,202 +1,296 @@
 #! /usr/bin/env python
 
-import sys, logging, os, subprocess, hashlib, json, datetime, webbrowser
+import sys
+import os
+import logging 
+import subprocess 
+import hashlib
+import json
+import datetime 
+import webbrowser 
+import random
 from git import *
 
 
 
 def usage():
+	logging.info("entering")
 	print "the following commands are valid:"
 
 def get_origin_url():
+	logging.info("entering")
 	origin_url = subprocess.check_output(["git", "config", "--get", "remote.origin.url"]).rstrip()
+	logging.info("origin_url = " + origin_url)
 	return origin_url
 
 def get_server_hostname(url):
+	logging.info("entering")
 	start = url.find("@")
 	url = url[start + 1:]
 	end = url.find(":")
 	hostname = url[:end]
+	logging.info("hostname = " + hostname)
 	return hostname
 
 def get_server_port(url):
+	logging.info("entering")
 	start = url.find(":")
 	url = url[start + 1:]
 	start = url.find(":")
 	url = url[start + 1:]
 	end = url.find("/")
 	port = url[:end]
+	logging.info("port = " + port)
 	return port
 
 def create_remote(repo):
+	logging.info("entering")
 	exists = False
-	
 	
 	for r in repo.remotes:
 		if r.name == "gerrit_upstream_remote":
 			exists = True
+			logging.info("repo already exists")
 	
 	if exists == False:
 		origin_url = get_origin_url()
+		logging.info("create new remote")
 		repo.create_remote('gerrit_upstream_remote', origin_url)
 
+	logging.info("fetching from remote")
 	repo.remote("gerrit_upstream_remote").fetch() 
 	
 	return repo.remote("gerrit_upstream_remote")
 	
 def branch_exist_local(bname, repo):
+	logging.info("entering")
 	found = False
 	for b in repo.branches:
 		if str(b) == bname:
 			found = True
+			logging.info("branch exists local")
+	
 	
 	return found;
 	
 def branch_exist_remote(bname, repo, remote):
+	logging.info("entering")
 	found = False
 	for r in remote.refs:
 		if str(r) == "gerrit_upstream_remote/" + bname:
 			found = True
+			logging.info("branch exists remote")
 	
 	return found;
+
+
 	
 def branch_exist(bname, repo, remote):
+	logging.info("entering")
 	
 	found = branch_exist_local(bname, repo)
 	
 	if found != True:
-		branch_exist_remote(bname, repo, remote)
+		found = branch_exist_remote(bname, repo, remote)
+		
+	if found == True:
+		logging.info("Branch exists")
+	else:
+		logging.info("Branch DOES NOT exist")
 		
 	return found
 
+
+
 def write_config(repo, issueid, key, value):
+	logging.info("entering")
+	
+	logging.info("paramaters[repo, issueid = " + issueid + ", key = " + key + ", value = " + value + "]")
 	writer = repo.config_writer("repository")
 	
 	sectionname = 'gerrit-flow "' + issueid + '"'
-	
+	logging.info("section name = " + sectionname)
 	if writer.has_section(sectionname) == False:
+		logging.info("writer doesn't have section")
 		writer.add_section(sectionname)
 	
 	writer.set(sectionname, key, value)
 	
+	
+	
 def read_config(repo, issueid, key):
+	logging.info("entering")	
+	logging.info("paramaters[repo, issueid = " + issueid + ", key = " + key + "]")
 	reader = repo.config_reader("repository")
 	
 	sectionname = 'gerrit-flow "' + issueid + '"'
+	logging.info("section name = " + sectionname)
 	
 	value = reader.get(sectionname, key)
+	logging.info("value = " + value)
 	
 	return value
+
+
+def get_commit_hash(issue_name):
+	logging.info("entering")
 	
+	logging.info("Issue name =" + issue_name)
+		
+	commithash = hashlib.new('ripemd160')
+	commithash.update(issue_name)
+	
+	logging.info("Commit Hash = I" + commithash.hexdigest())
+	
+	return commithash.hexdigest()
+
+def issue_exists_on_server(issue_name):
+	logging.info("entering")
+
+	url = get_origin_url()
+	hostname = get_server_hostname(url)
+	port = get_server_port(url)
+				
+	commithash = get_commit_hash(issue_name)
+	
+	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--current-patch-set", "change:I" + commithash ])
+	if len(info.splitlines()) > 1:
+		logging.info("Issue exists")
+		return True
+	else:
+		logging.info("Issue DOES NOT exist")
+		return False
+	
+	
+
+
 def checkout(repo, bname):
+	logging.info("entering")
+		
+	if repo.is_dirty() == True:
+		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		logging.info("Dirty repo")
+		return False
+
 # need to check if there are modified files, if there are fail
 	for b in repo.branches:
 		if str(b) == bname:
+			logging.info("found branch")
 			b.checkout()
 			return True
 		
 	return False
 
 def do_start(argv):
+	logging.info("entering")
 
 	# start ISSUEID  <origin point>	
-	logging.warning("entering :" + str(argv))
 	
 	
 	if len(argv) < 3 or len(argv) > 4:
 		# not a valid star command
-		print "Invalid command - usage is as follows"
-		usage()
+		print "Invalid command parameters"
+		logging.info("Bad parameters")
 		return
 	
 	repo = Repo(os.getcwd())
 	
 	if repo.is_dirty() == True:
 		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		logging.info("Repor dirty")
 		return
 	
 	issueid = argv[2]
 		
-	global startpoint
+	startpoint = "master"
 		
 	if len(argv) == 4:
 		startpoint = argv[3]
-	else:
-		startpoint = "master"
+
+	logging.info("Startpoint is " + startpoint)
 
 	
 	remote = create_remote(repo)
 	
 	if branch_exist_remote(startpoint, repo, remote) == False:
-		print "The requested startpoint cannot be found on the gerrit server, you must specify a branch which exists upstream(where you changes will be merged back onto)"
+		print "Oh Dear:\n\tThe requested startpoint cannot be found on the gerrit server, you must" + \
+		"\tspecify a branch which exists upstream(where you changes will be merged back onto)"
+		logging.info("Startpoint not on server")
 	else:
 		if branch_exist(issueid, repo, remote) == False:
+			logging.info("No branch called " + issueid + " exists")
 			repo.git.branch(issueid, 'gerrit_upstream_remote/' + startpoint)
 			if branch_exist_local(issueid, repo) == True:
 				# creation of branch was succesful
-			
 				write_config(repo, issueid, "startpoint" , startpoint)
-				
 				checkout(repo, issueid)
+				print("You are now checkedout on " + issueid)
+				logging.info("Brnach creation was succesful")
+			else:
+				logging.info("Branch creation Failed")
 
 		else:
-			print " A local branch called " + issueid + " exists!. As such we cannot start a new instance for this issue."
+			print "Oh Dear:\n\tA local branch called " + issueid + " exists!.\n\tAs such we cannot start a new instance for this issue."
+			logging.info("Local brnach already exists")
 
 	
 def submit(repo, ref, append):
+	logging.info("entering")
 	remote = create_remote(repo)
 		
 	issueid = repo.active_branch
 		
-	print issueid
 	startpoint = read_config(repo, issueid.name, "startpoint")
-		
+	logging.info("Startpoint = " + startpoint)
 	# Check that the branch doesn't exist, then create it
 	if branch_exist(issueid.name + append, repo, remote) == True:
 		print "PANIC Stations:\n\tThe branch for this change commit already exists, this\n\tlikely means that a" + \
 			" previous draft upload\n\tfailed, the branch called " + issueid.name + append + \
 			" must be\n\tremoved before you can continue."
+		logging.debug("Submit Branch already exits, this is bad")
 	else:
+			failed = False
 			retval = repo.git.branch(issueid.name + append, 'gerrit_upstream_remote/' + startpoint)
-			print retval
 			retval = checkout(repo, issueid.name + append)
-			print retval
 			try:
 				retval = repo.git.merge("--squash", "--no-commit", issueid)
 			except:
 				print "Oh Dear:\n\tThe merge into the latest tip of " + startpoint + " failed." + \
 						"\n\tThe likely hood is that you need to merge in the latest changes in " + startpoint + \
 						"\n\tinto your branch"
+				logging.info("Merge into latest tip of startpoint failed")
+				logging.info("Reset head --hard")
 				repo.git.reset("--hard", "HEAD")
 				issueid.checkout()
+				logging.info("Deleting brnach " + issueid.name + append)
 				repo.git.branch("-D", issueid.name + append)
 				return
 		
-			commithash = hashlib.new('ripemd160')
-			commithash.update(issueid.name)
+			commithash = get_commit_hash(issueid.name)
 			
 			url = get_origin_url()
 			hostname = get_server_hostname(url)
 			port = get_server_port(url)
 			
-			commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "change:I" + commithash.hexdigest() ])
+			commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "change:I" + commithash ])
 			if commitmessage.find('"rowCount":0') >= 0:
 				# we don't have so a commit message
+				logging.info("No commit message exists so making one")
 				commitmessage = issueid.name + " - \n# Brief summary on line above(<50 chars)\n\n" + \
 					"# Describe in detail the change below\nChange-Description:\n\n\n# Describe how to test your change below\n" + \
 				 	"Change-TestProcedure:\n\n\n# DO NOT EDIT ANYTHING BELOW HERE\n\nGerrit.startpoint:" + startpoint + \
-				 	"\n\nChange-Id:I" + commithash.hexdigest()
+				 	"\n\nChange-Id:I" + commithash
 			else:
 				# we have a commit message be we have to paarse if from json
-				print commitmessage
+				logging.info("We have a commit message")
 				start = commitmessage.find(',"commitMessage":"')
 				start = start + 18
 				
 				end = commitmessage.find('","createdOn":')
 				commitmessage = commitmessage[start:end].replace("\\n", "\n")
-				print commitmessage
 				commitmessage = commitmessage.replace("Gerrit.startpoint:", "# DO NOT EDIT ANYTHING BELOW HERE\n\nGerrit.startpoint:")
-								
+			
+			logging.info("Writing commit message")
 			f = open(issueid.name + '_commitmessage', 'w')
 			f.write(commitmessage)
 			f.close()
@@ -217,26 +311,30 @@ def submit(repo, ref, append):
 			except subprocess.CalledProcessError as e:
 				retval = e.output
 			
-			print "ret = "
-			print retval.find("(no changes made)")
 			if retval.find("(no changes made)") >= 0:
+				logging.info("o cahnges made")
 				print "Oh Dear: \n\tYou don't seem to have commited any changes, make\n\tsure you have saved your files, and committed them!!"
-			
+				failed = True
 			issueid.checkout()
+			logging.info("Checked out original brnach")
+			logging.info("Deleting brnach " + issueid.name + append)
 			repo.git.branch("-D", issueid.name + append)
-				
+			if failed == False:
+				print "Successfully pushed to Gerrit server"
+			
 
 def do_draft(argv):
-	print 'Argument List start :', str(argv)
+	logging.info("entering")
 	if len(argv) != 2:
 		# not a valid star command
-		print "Invalid command - usage is as follows"
-		usage()
+		print "Invalid command syntax, please try again"
+		logging.info("Invalid command parameters")
 		return
 	
 	repo = Repo(os.getcwd())
 	if repo.is_dirty() == True:
 		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		logging.info("Repo is dirty")
 		return
 	
 	repo = Repo(os.getcwd())
@@ -247,63 +345,73 @@ def do_draft(argv):
 	
 	
 def do_push(argv):
-	print 'Argument List start :', str(argv)
+	logging.info("entering")
 	if len(argv) != 2:
 		# not a valid star command
-		print "Invalid command - usage is as follows"
-		usage()
+		print "Invalid command syntax, please try again"
+		logging.info("Invalid command parameters")
 		return
 	
 	repo = Repo(os.getcwd())
 	if repo.is_dirty() == True:
 		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		logging.info("Repo is dirty")
 		return
 
 	submit(repo, "HEAD:refs/for/", "_push")
 		
 		
 def clone_ref(issue_name, repo):
-	print "clone_ref - " + issue_name
-	commithash = hashlib.new('ripemd160')
-	commithash.update(issue_name)
+	logging.info("entering")
+	
+	commithash = get_commit_hash(issue_name)
 	
 	url = get_origin_url()
 	hostname = get_server_hostname(url)
 	port = get_server_port(url)
 			
-	commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--current-patch-set", "change:I" + commithash.hexdigest() ])
+	commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--current-patch-set", "change:I" + commithash ])
+	# TODO use issue_exists_on_server function?
 	if commitmessage.find('"rowCount":0') >= 0:
 		# we don't have so a commit message
 		print "Oh Dear:\n\tThe issue name you provided doesn't seem to exist on\n\tthe server(" + hostname + "), check you know how to type and\n\tthe change is on the server."
+		logging.info("Issue doesn't exist on server")
 		return ""
 	else:
+		# TODO use JSON properly
 		create_remote(repo)
 		start = commitmessage.find('"ref":"')
 		start = start + 7
 		end = commitmessage.find('","uploader"')
 		ref = commitmessage[start:end]
-		print ref
 		repo.git.fetch("gerrit_upstream_remote", ref)
 		repo.git.checkout("FETCH_HEAD")
+		logging.info("returning ref = " + ref)
 		return ref
 
 def do_rework(argv):
+	logging.info("entering")
+	
 	if len(argv) < 3 or len(argv) > 4 :
 		# not a valid star command
-		print "Invalid command - usage is as follows"
-		usage()
+		print "Invalid command"
+		logging.warning("Invalid command options")
 		return
 	
 	repo = Repo(os.getcwd())
 	if repo.is_dirty() == True:
 		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		logging.warning("Dirty repo")
 		return
 	
 	issue_name = argv[2]
+	logging.info("issue anme = " + issue_name)
+	
 	mergechanges = False
 	if len(argv) == 4:
 		if argv[3] == "merge":
 			mergechanges = True
+			logging.info("Merge changes selected")
 		
 	ref = clone_ref(issue_name, repo)
 	if ref != "":
@@ -311,21 +419,23 @@ def do_rework(argv):
 		if branch_exist_local(issue_name, repo) == False:
 			if mergechanges == False:
 				repo.git.checkout("-b", issue_name)
+				logging.info("checkout -b " + issue_name)
 				if(repo.active_branch.name != issue_name):
 					print "Oh Dear:\n\tCheckout of the new branch failed. Please clean the git repo and try again!"
+					logging.info("Failed to checkout brnach " + issue_name)
 				else:
 					print "You are now on branch " + issue_name
-					
-				commithash = hashlib.new('ripemd160')
-				commithash.update(issue_name)
+					logging.info("Checked out " + issue_name)
+								
+				commithash = get_commit_hash(issue_name)
 	
 				url = get_origin_url()
 				hostname = get_server_hostname(url)
 				port = get_server_port(url)
 			
-				commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "change:I" + commithash.hexdigest() ])
+				commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "change:I" + commithash ])
 				
-				print "commitmesage1 =" + commitmessage
+				# TODO This should be parsed from json, not from string
 				start = commitmessage.find(',"commitMessage":"')
 				start = start + 18
 				
@@ -336,10 +446,12 @@ def do_rework(argv):
 				for line in commitmessage.split('\n'):
 					if line.find("Gerrit.startpoint:") != -1:
 						startpoint = line.split(':')[1]
-
+						logging.info("Startpoint = " + startpoint)
+						
 				write_config(repo, issue_name, "startpoint" , startpoint)
 			else:
 				print "Oh Dear: You have requested a merge but the branch doesn't currently exist locally."
+				logging.info("Merge requested but brnach doesn't exist")
 		else:
 			# brnach exists
 			if mergechanges == False:
@@ -347,57 +459,71 @@ def do_rework(argv):
 				"due to a branch with this name already existing. If you want to" + \
 				"\n\tmerge the changes onto that branch then run git gerrit rework ISSUEID merge" + \
 				"\n\tPlease remove this branch and try again!"
+				logging.info("Brnach name seems to exist so can't create")
 			else:
+				logging.info("checkout " + issue_name)
 				repo.git.checkout(issue_name)
 				if(repo.active_branch.name != issue_name):
+					logging.info("Failed to chechout branch " + issue_name)
 					print "Oh Dear:\n\tCheckout of the existing branch failed, please check that you have a clean git repo"
 				else:
 					print "You are now on branch " + issue_name
+					logging.info("Checked out " + issue_name)
 					
 				try:
+					logging.info("pulling gerrit remote with ref = " + ref)
 					repo.git.pull("gerrit_upstream_remote", ref)
+					
 				except GitCommandError as e:
 					if e.status == 1:
-						print "Oh Dear:\n\tIt appears that the automerge failed, please use\n\t git mergetool to complete the action and then perform a commit"
-							
+						print "Oh Dear:\n\tIt appears that the automerge into " + startpoint + " failed, please use\n\t git mergetool to complete the action and then perform a commit."
+						logging.info("automerge failed")
+					else:
+						logging.warning("pull failed, big issue")
 				
-			
+################################		
 				
 	
 def do_suck(argv):
+	logging.info("entering")
 	if len(argv) != 3 :
 		# not a valid star command
-		print "Invalid command - usage is as follows"
-		usage()
+		print "Invalid command options, please read the docs"
+		logging.info("Invalid command options")
 		return
 	
 	repo = Repo(os.getcwd())
 	if repo.is_dirty() == True:
 		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		logging.info("Repo is dirty")
 		return
 	
 	issue_name = argv[2]
 	if branch_exist_local(issue_name, repo) == False:
 		clone_ref(issue_name, repo,)
 		try:
+			logging.info("checkout -b" + issue_name + "_suck")
 			repo.git.checkout("-b", issue_name + "_suck")
+			print "You are now on branch" + issue_name + "_suck, please delete when done"
 		except:
 			print "Oh Dear:\n\tIt appears that the creation of the new branch " + issue_name + "_suck has\n\tfailed. Please check you git repo and try again."
+			logging.info("Creation of branch " + issue_name + "_suck failed")
 	else:
 		print "Oh Dear:\n\tIt appears that the creation of the new branch " + issue_name + "_suck can't \n\thappen" + \
 				"due to a branch with this name already existing. If you want to" + \
 				"\n\tmerge the changes onto that branch then run git gerrit rework ISSUEID merge" + \
 				"\n\tPlease remove this branch and try again!"
+		logging.info("brnach called " + issue_name + "_suck already exists")
 
 def review_summary(issue_name):
+	logging.info("entering")
 	url = get_origin_url()
 	hostname = get_server_hostname(url)
 	port = get_server_port(url)
 				
-	commithash = hashlib.new('ripemd160')
-	commithash.update(issue_name)
+	commithash = get_commit_hash(issue_name)
 				
-	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "--current-patch-set", "change:I" + commithash.hexdigest() ])
+	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "--current-patch-set", "change:I" + commithash ])
 	# info.replace("id: I", "Change ID: I")
 	decoded = json.loads(info.splitlines()[0])
 	
@@ -425,16 +551,16 @@ def review_summary(issue_name):
 	
 	print "\nNumber of Patchsets : " + str(numberofpatches)
 	print "Change URI : " + uri
-	
+
 def review_web(issue_name):
+	logging.info("entering")
 	url = get_origin_url()
 	hostname = get_server_hostname(url)
 	port = get_server_port(url)
 				
-	commithash = hashlib.new('ripemd160')
-	commithash.update(issue_name)
+	commithash = get_commit_hash(issue_name)
 				
-	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "--current-patch-set", "change:I" + commithash.hexdigest() ])
+	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "--current-patch-set", "change:I" + commithash ])
 	decoded = json.loads(info.splitlines()[0])
 	uri = decoded['url']
 	try:
@@ -443,19 +569,21 @@ def review_web(issue_name):
 		print "Oh Dear:\n\tIt appears that we can't open a browser or that the uri we have is invalid. Try visiting: " + uri
 
 def review_patch(issue_name):
+	logging.info("entering")
 	repo = Repo(os.getcwd())
 
 	url = get_origin_url()
 	hostname = get_server_hostname(url)
 	port = get_server_port(url)
 				
-	commithash = hashlib.new('ripemd160')
-	commithash.update(issue_name)
+	commithash = get_commit_hash(issue_name)
 				
-	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--current-patch-set", "change:I" + commithash.hexdigest() ])
+	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--current-patch-set", "change:I" + commithash ])
 	decoded = json.loads(info.splitlines()[0])
 	
 	ref = decoded['currentPatchSet']['ref']
+	logging.info("ref = " + ref)
+	
 	repo.git.fetch(url, ref)
 	patch = subprocess.check_output(['git', "format-patch", "-1", "--stdout", "FETCH_HEAD" ])
 	print patch
@@ -464,8 +592,27 @@ def review_patch(issue_name):
 
 
 def review_tool(issue_name):
-	print "review_tool"
+	logging.info("entering")
+	repo = Repo(os.getcwd())
+
+	url = get_origin_url()
+	hostname = get_server_hostname(url)
+	port = get_server_port(url)
+				
+	commithash = get_commit_hash(issue_name)
+				
+	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--current-patch-set", "change:I" + commithash])
+	decoded = json.loads(info.splitlines()[0])
 	
+	ref = decoded['currentPatchSet']['ref']
+	logging.info("ref = " + ref)
+	
+	repo.git.fetch(url, ref)
+		
+	repo.git.difftool("--no-prompt", "FETCH_HEAD~..FETCH_HEAD")
+	
+	
+
 summary_type = {
 	'web': 		review_web,
 	'summary':	review_summary,
@@ -473,53 +620,67 @@ summary_type = {
 	'tool': 	review_tool,
 }
 
-
+	
 def do_review(argv):
+	logging.info("entering")
 	if len(argv) < 3 or len(argv) > 4 :
 		# not a valid star command
-		print "Invalid command - usage is as follows"
-		usage()
+		print "Oh Dear:\n\tInvalid command, make sure you specified an issue and try again."
+		logging.warning("Invalid command used")
+		return
+	
+	issue_name = argv[2]
+	
+	if False == issue_exists_on_server(issue_name):
+		print "Oh Dear:\n\tThe issue appears not to exist on the server, please check for typos!"
 		return
 	
 	stype = "web"
-	
-	issue_name = argv[2]
+		
 	if len(argv) == 4:
 		stype = argv[3]
 		
 	if stype in summary_type:
+		logging.info("Summary type running - " + stype)
 		summary_type[stype](issue_name)
 	else:
-		print "Oh Dear:\n\tThis is not a valid review type. Check for a type!! \n\n\tIf you would like a new type adding let us know!"
+		logging.warning("Not a Valid review type")
+		print "Oh Dear:\n\tThis is not a valid review type. Check for a type!! \n\n\tIf you would like a new type adding let us know!"	
+
 
 def do_cherrypick(argv):
+	logging.info("entering")
 	repo = Repo(os.getcwd())
 	if repo.is_dirty() == True:
 		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		logging.warning("Repo Dirty")
 		return
 	
 	if len(argv) != 3:
 		print "Oh Dear:\n\tCherrypick only supports a command with a issue name after it, please try again!"
+		logging.warning("Bad command used")
 		return
 	
 	issue_name = argv[2]
+
 	
 	url = get_origin_url()
 	hostname = get_server_hostname(url)
 	port = get_server_port(url)
 				
-	commithash = hashlib.new('ripemd160')
-	commithash.update(issue_name)
-				
-	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--current-patch-set", "change:I" + commithash.hexdigest() ])
+	commithash = get_commit_hash(issue_name)
+			
+	info = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--current-patch-set", "change:I" + commithash ])
 	decoded = json.loads(info.splitlines()[0])
 	
 	ref = decoded['currentPatchSet']['ref']
+	
+	logging.info("ref = " + ref)
+	
 	repo.git.fetch(url, ref)
 	repo.git.cherry_pick("FETCH_HEAD")
 	
 	
-
 
 dispatch = {
 	'start': 		do_start,
@@ -534,19 +695,22 @@ dispatch = {
 
 
 def main():
+	logging.info("entering")
+	logging.info("os.getcwd() = " + os.getcwd())
+	logging.info("Number of arguments:" + str(len(sys.argv)))
 
-	print os.getcwd()
-	
-
-	print 'Number of arguments:', len(sys.argv), 'arguments.'
-
+	logging.info("Arguments:")
+	for a in sys.argv:
+		logging.info("\t" + a)
 
 	if sys.argv[1] in dispatch:
 		dispatch[sys.argv[1]](sys.argv)
 	else:
-		print "nothin"
+		logging.warning("No matching command")
+		print "Oh Dear:\n\tThere is no matching command, did you RTFM? or do we have a bug?"
 
 
 if __name__ == "__main__":
-	logging.basicConfig(format="%(asctime)s: - %(filename)s: - %(funcName)s:%(message)s", level=logging.DEBUG, stream=sys.stdout)
+	rnum = random.randint(100000, 999999)
+	logging.basicConfig(format="%(asctime)s: - " + str(rnum) + " - %(filename)s: -  %(funcName)s() - %(lineno)d : %(message)s", level=logging.DEBUG, filename='/tmp/gerrit-flow.log')
 	main()
