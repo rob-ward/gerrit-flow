@@ -25,21 +25,22 @@ The standard commands provided are:
 		
 
 A standard workflow for gerrit is:
-	Using git gerrit start create a local branch for your changes.
+
+   Using git gerrit start create a local branch for your changes.
 	
-	You now make any changes you want with as many commits as you wish.
+   You now make any changes you want with as many commits as you wish.
 	
-	When you want to put the changes on the server for review you do a git gerrit push
+   When you want to put the changes on the server for review you do a git gerrit push
 	
-	You will be asked to complete a commit message.
+   You will be asked to complete a commit message.
 	
-	Upon completion this change can then be seen on the server
+   Upon completion this change can then be seen on the server
 	
 
 Installing gerrit-flow
 -------------------
 
-Download a copy of the gerrit code from githum
+Download a copy of the gerrit code from github
 
 Add the following to you ~/.gitconfig:
 
