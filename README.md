@@ -44,7 +44,7 @@ Download a copy of the gerrit code from githum
 Add the following to you ~/.gitconfig:
 
 [alias]
-	gerrit = !<DOWNLAOD LOCATION>/gerrit.py
+	gerrit = !\<DOWNLOAD LOCATION\>/gerrit.py
 	
 
 
