@@ -1,5 +1,16 @@
 #! /usr/bin/env python
+#
+# gerrit-flow -- Is a set of functionality to support interaction with
+# the gerrit code review tool (http://code.google.com/p/gerrit/)
+#
+# This tool supports interaction with the gerrit server in a way that
+# allows a number of workflows to be used in development.
+# 
+# Please report any bugs to or feature requests to;
+# 			https://github.com/rob-ward/gerrit-flow
+#
 
+ 
 import sys
 import os
 import logging 
@@ -11,17 +22,15 @@ import webbrowser
 import random
 from git import *
 
-
-
-def usage():
-	logging.info("entering")
-	print "the following commands are valid:"
+#############################
 
 def get_origin_url():
 	logging.info("entering")
 	origin_url = subprocess.check_output(["git", "config", "--get", "remote.origin.url"]).rstrip()
 	logging.info("origin_url = " + origin_url)
 	return origin_url
+
+#############################
 
 def get_server_hostname(url):
 	logging.info("entering")
@@ -31,6 +40,8 @@ def get_server_hostname(url):
 	hostname = url[:end]
 	logging.info("hostname = " + hostname)
 	return hostname
+
+#############################
 
 def get_server_port(url):
 	logging.info("entering")
@@ -42,6 +53,8 @@ def get_server_port(url):
 	port = url[:end]
 	logging.info("port = " + port)
 	return port
+
+#############################
 
 def create_remote(repo):
 	logging.info("entering")
@@ -61,7 +74,9 @@ def create_remote(repo):
 	repo.remote("gerrit_upstream_remote").fetch() 
 	
 	return repo.remote("gerrit_upstream_remote")
-	
+
+#############################
+
 def branch_exist_local(bname, repo):
 	logging.info("entering")
 	found = False
@@ -72,6 +87,8 @@ def branch_exist_local(bname, repo):
 	
 	
 	return found;
+
+#############################
 	
 def branch_exist_remote(bname, repo, remote):
 	logging.info("entering")
@@ -83,8 +100,8 @@ def branch_exist_remote(bname, repo, remote):
 	
 	return found;
 
+#############################
 
-	
 def branch_exist(bname, repo, remote):
 	logging.info("entering")
 	
@@ -100,7 +117,7 @@ def branch_exist(bname, repo, remote):
 		
 	return found
 
-
+#############################
 
 def write_config(repo, issueid, key, value):
 	logging.info("entering")
@@ -116,7 +133,7 @@ def write_config(repo, issueid, key, value):
 	
 	writer.set(sectionname, key, value)
 	
-	
+#############################	
 	
 def read_config(repo, issueid, key):
 	logging.info("entering")	
@@ -131,6 +148,7 @@ def read_config(repo, issueid, key):
 	
 	return value
 
+#############################
 
 def get_commit_hash(issue_name):
 	logging.info("entering")
@@ -143,6 +161,8 @@ def get_commit_hash(issue_name):
 	logging.info("Commit Hash = I" + commithash.hexdigest())
 	
 	return commithash.hexdigest()
+
+#############################
 
 def issue_exists_on_server(issue_name):
 	logging.info("entering")
@@ -161,8 +181,7 @@ def issue_exists_on_server(issue_name):
 		logging.info("Issue DOES NOT exist")
 		return False
 	
-	
-
+#############################
 
 def checkout(repo, bname):
 	logging.info("entering")
@@ -180,6 +199,8 @@ def checkout(repo, bname):
 			return True
 		
 	return False
+
+#############################
 
 def do_start(argv):
 	logging.info("entering")
@@ -233,7 +254,8 @@ def do_start(argv):
 			print "Oh Dear:\n\tA local branch called " + issueid + " exists!.\n\tAs such we cannot start a new instance for this issue."
 			logging.info("Local brnach already exists")
 
-	
+#############################
+
 def submit(repo, ref, append):
 	logging.info("entering")
 	remote = create_remote(repo)
@@ -322,6 +344,7 @@ def submit(repo, ref, append):
 			if failed == False:
 				print "Successfully pushed to Gerrit server"
 			
+#############################
 
 def do_draft(argv):
 	logging.info("entering")
@@ -340,9 +363,7 @@ def do_draft(argv):
 	repo = Repo(os.getcwd())
 	submit(repo, "HEAD:refs/drafts/", "_draft")
 		
-		
-		
-	
+#############################
 	
 def do_push(argv):
 	logging.info("entering")
@@ -359,7 +380,8 @@ def do_push(argv):
 		return
 
 	submit(repo, "HEAD:refs/for/", "_push")
-		
+
+#############################	
 		
 def clone_ref(issue_name, repo):
 	logging.info("entering")
@@ -388,6 +410,8 @@ def clone_ref(issue_name, repo):
 		repo.git.checkout("FETCH_HEAD")
 		logging.info("returning ref = " + ref)
 		return ref
+
+#############################
 
 def do_rework(argv):
 	logging.info("entering")
@@ -481,8 +505,7 @@ def do_rework(argv):
 					else:
 						logging.warning("pull failed, big issue")
 				
-################################		
-				
+################################					
 	
 def do_suck(argv):
 	logging.info("entering")
@@ -515,6 +538,8 @@ def do_suck(argv):
 				"\n\tPlease remove this branch and try again!"
 		logging.info("brnach called " + issue_name + "_suck already exists")
 
+#############################
+
 def review_summary(issue_name):
 	logging.info("entering")
 	url = get_origin_url()
@@ -536,8 +561,7 @@ def review_summary(issue_name):
 	updated = datetime.datetime.fromtimestamp(decoded['lastUpdated']).strftime('%d-%m-%Y %H:%M:%S')
 	commitmessage = decoded['commitMessage']
 	numberofpatches = decoded['currentPatchSet']['number']
-	uri = decoded['url']
-	
+	uri = decoded['url']	
 	
 	print "Project : " + project
 	print "Branch : " + branch
@@ -551,6 +575,8 @@ def review_summary(issue_name):
 	
 	print "\nNumber of Patchsets : " + str(numberofpatches)
 	print "Change URI : " + uri
+
+#############################
 
 def review_web(issue_name):
 	logging.info("entering")
@@ -567,6 +593,8 @@ def review_web(issue_name):
 		webbrowser.open(uri)
 	except:
 		print "Oh Dear:\n\tIt appears that we can't open a browser or that the uri we have is invalid. Try visiting: " + uri
+
+#############################
 
 def review_patch(issue_name):
 	logging.info("entering")
@@ -588,8 +616,7 @@ def review_patch(issue_name):
 	patch = subprocess.check_output(['git', "format-patch", "-1", "--stdout", "FETCH_HEAD" ])
 	print patch
 	
-
-
+#############################
 
 def review_tool(issue_name):
 	logging.info("entering")
@@ -611,9 +638,9 @@ def review_tool(issue_name):
 		
 	repo.git.difftool("--no-prompt", "FETCH_HEAD~..FETCH_HEAD")
 	
-	
+#############################	
 
-summary_type = {
+review_type = {
 	'web': 		review_web,
 	'summary':	review_summary,
 	'patch': 	review_patch,
@@ -640,13 +667,14 @@ def do_review(argv):
 	if len(argv) == 4:
 		stype = argv[3]
 		
-	if stype in summary_type:
+	if stype in review_type:
 		logging.info("Summary type running - " + stype)
-		summary_type[stype](issue_name)
+		review_type[stype](issue_name)
 	else:
 		logging.warning("Not a Valid review type")
 		print "Oh Dear:\n\tThis is not a valid review type. Check for a type!! \n\n\tIf you would like a new type adding let us know!"	
 
+#############################	
 
 def do_cherrypick(argv):
 	logging.info("entering")
@@ -680,7 +708,109 @@ def do_cherrypick(argv):
 	repo.git.fetch(url, ref)
 	repo.git.cherry_pick("FETCH_HEAD")
 	
+#############################	
+
+def help_start():
+	logging.info("entering")
+	print "\n\nstart:\n\n\tgit gerrit start <ISSUEID> (STARTPOINT)" + \
+	"\n\n\tWhere <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine" + \
+	"\n\n\tWhere (STARTPOINT) is an optional argument dictating which branch you are developing on, the default unless set in a config file is master"
+	"\n\n\tStart is used to setup a new set of changes, this creates a brnach and puts tracking information in your configuration"
+
+#############################	
+
+def help_draft():
+	logging.info("entering")
+	print "\n\ndraft:\n\n\tgit gerrit draft" + \
+	"\n\n\tDraft is used to push the changes on the current branch onto the gerrit server in draft mode, these changes cannot be seen until published"
+
+#############################	
+
+def help_push():
+	logging.info("entering")
+	print "\n\npush:\n\n\tgit gerrit push" + \
+	"\n\n\tpush is used to push the changes on the current branch onto the gerrit server for review. Depending on your" + \
+	"\n\tworkflow you will likely need to add reviewers to the issue after pushing"
+
+#############################	
+
+def help_rework():
+	logging.info("entering")
+	print "\n\nrework:\n\n\tgit gerrit rework <ISSUEID>" + \
+	"\n\n\tWhere <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine" + \
+	"\n\n\trework will create you a brnach called <ISSUEID> where you can make any changes you require and push" + \
+	"\n\tthem back to the server, this allows you to take control of a change already pushed by someopne else or" + \
+	"\n\treclaim a change if someone else has worked on it"
+#############################	
+
+def help_suck():
+	logging.info("entering")
+	print "\n\nsuck:\n\n\tgit gerrit suck <ISSUEID>" + \
+	"\n\n\tWhere <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine" + \
+	"\n\n\tsuck downloads a copy of changes for <ISSUEID> from the server into a branch called <ISSUEID>_suck." + \
+	"\n\tHere you can build changes for testing etc. You should not use this brnahc to modify the code if you want the" + \
+	"\n\tchanges to go back to the server. For this you shuld use rework. Once you have finished with the changes you can delete the branch"
 	
+#############################	
+
+def help_review():
+	logging.info("entering")
+	print "\n\nreview:\n\n\tgit gerrit review <ISSUEID> (TYPE)" + \
+	"\n\n\tWhere <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine" + \
+	"\n\n\tWhere (TYPE) is an optional argument stating the review type wanted, valid types are:" + \
+	"\n\t\t\tsummary - This will output a summary of the change on the commandline" + \
+	"\n\t\t\tweb - This will take you to the change on the website" + \
+	"\n\t\t\tpatch - This will give you a patchset for the change" + \
+	"\n\t\t\ttool - This will show you the delta in a GUI tool" + \
+	"\n\n\treview is primarily used for getting information about a change, the default review command will take you to the gerrit review page i.e. web mode"
+	
+#############################	
+
+def help_cherrypick():
+	logging.info("entering")
+	print "\n\n\tcherrypick:\n\n\tgit gerrit cherrypick <ISSUEID>" + \
+	"\n\n\t\tWhere <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine" + \
+	"\n\n\t\tcherrypick is used to merge a given change on the server into your local branch. Please note, currently dependancy management is not done automatically"
+
+#############################	
+
+helpmap = {
+	'start': 		help_start,
+	'draft':		help_draft,
+	'push': 		help_push,
+	'rework': 		help_rework,
+	'suck': 		help_suck,
+	'review': 		help_review,
+	'cherrypick': 	help_cherrypick,
+	'cherry-pick': 	help_cherrypick,
+}
+
+def do_help(argv):
+	logging.info("entering")
+	threeargs = False
+	if len(argv) == 3:
+		if sys.argv[2] in helpmap:
+			print "Gerritflow " + sys.argv[2] + " usage:"
+			helpmap[sys.argv[2]]()
+			return
+		
+		threeargs = True
+
+	print "Gerrit-flow usage is as follows:"
+
+	print "\tSubcommand list is:"
+	print "\t\tstart\n\t\tdraft\n\t\tpush\n\t\trework\n\t\tsuck\n\t\treview\n\t\tcherrypick\n\t\tall"
+	
+	
+
+	if threeargs == True:
+		if sys.argv[2] == "all":
+			for c in helpmap:
+				helpmap[c]()
+	else:
+		print "For more information run git gerrit help <COMMAND>"
+
+#############################	
 
 dispatch = {
 	'start': 		do_start,
@@ -691,6 +821,7 @@ dispatch = {
 	'review': 		do_review,
 	'cherrypick': 	do_cherrypick,
 	'cherry-pick': 	do_cherrypick,
+	'help':			do_help,
 }
 
 
@@ -709,6 +840,7 @@ def main():
 		logging.warning("No matching command")
 		print "Oh Dear:\n\tThere is no matching command, did you RTFM? or do we have a bug?"
 
+#############################	
 
 if __name__ == "__main__":
 	rnum = random.randint(100000, 999999)
