@@ -49,6 +49,7 @@ Add the following to you ~/.gitconfig:
 	
 
 
-
+Install dependacies using:
+	sudo easy_install GitPython
 	
 
