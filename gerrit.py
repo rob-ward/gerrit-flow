@@ -59,6 +59,11 @@ def get_origin_url():
 def get_server_hostname(url):
 	logging.info("entering")
 	start = url.find("@")
+	if start == -1:
+		#we need to handle urls without a username
+		start = url.find(":")
+		start = start + 2 # miss the //
+
 	url = url[start + 1:]
 	end = url.find(":")
 	hostname = url[:end]
