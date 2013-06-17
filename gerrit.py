@@ -368,6 +368,9 @@ def submit(repo, ref, append):
 			except subprocess.CalledProcessError as e:
 				retval = e.output
 			
+			#we want the output so print
+			print retval
+
 			if retval.find("(no changes made)") >= 0:
 				logging.info("o cahnges made")
 				print "Oh Dear: \n\tYou don't seem to have commited any changes, make\n\tsure you have saved your files, and committed them!!"
