@@ -567,6 +567,155 @@ def do_suck(argv):
 				"\n\tPlease remove this branch and try again!"
 		logging.info("brnach called " + issue_name + "_suck already exists")
 
+
+#############################	
+
+def do_share(argv):
+	logging.info("entering")
+	repo = Repo(os.getcwd())
+	if repo.is_dirty() == True:
+		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		logging.warning("Repo Dirty")
+		return
+	
+	url = get_origin_url()
+	hostname = get_server_hostname(url)
+	port = get_server_port(url)
+
+	issueid = repo.active_branch
+	
+	remote = create_remote(repo)
+  
+	share_name = "share/" + issueid.name
+
+	# we need to check that we aren't on a share branch, we don't want share/share/share....
+	if issueid.name[:6] == "share/":
+		print "Oh Dear:\n\tIt appears that the branch you are on is already a share!!"
+		logging.warning("Share - " + share_name + " is already a share")
+		return
+				
+	#Check that share/<ISSUEID> doesn't exists, if it does error as we can't have two
+	if branch_exist(share_name, repo, remote) == True:
+		print "Oh Dear:\n\tShare " + share_name + " already exists"
+		logging.warning("Share - " + share_name + " already exists")
+		return
+
+	#Move the brnach to a share version
+	repo.git.branch("-m", issueid, share_name)
+	repo.git.push("origin", share_name)
+
+	try:
+		retval =  subprocess.check_output(["git", "push", "gerrit_upstream_remote", share_name], stderr=subprocess.STDOUT)
+	except subprocess.CalledProcessError as e:
+		retval = e.output
+
+	print retval
+	
+#############################	
+
+def do_scrunch(argv):
+	logging.info("entering")
+	repo = Repo(os.getcwd())
+
+	if repo.is_dirty() == True:
+		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		logging.warning("Repo Dirty")
+		return
+
+	
+	if len(argv) != 4:
+		print "Oh Dear:\n\tScrunch only supports a command with a branch in the form share/ISSUEID and a merge to branch " + \
+      "after it, please see help for more info!"
+		logging.warning("Scrunch - didn't provide branch from and branch to")
+		return
+
+	url = get_origin_url()
+	hostname = get_server_hostname(url)
+	port = get_server_port(url)
+	
+	branch_from = argv[2]
+	branch_to = argv[3]
+
+	branch_issuename = branch_from[6:]
+
+	remote = create_remote(repo)
+  
+	#We take files to merge from the server so it must exist
+	if branch_exist_remote(branch_from, repo, remote) == False:
+		print "Oh Dear:\n\tBranch " + branch_from + " does not exist on the gerrit server, we will only merge from the server!!!"
+		logging.warning("Branch " + branch_from + " does not exist on server for scrunching")
+		return
+
+	print "Using branch " + branch_from + " from server"
+
+	if branch_exist_local(branch_issuename, repo) == True:
+		print "Oh Dear:\n\tA local branch called " + branch_issuename + " exists, we cannot scrunch while it exists!"
+		logging.warning("Branch " + branch_issuename + " exist locally")
+		return
+
+   
+	if issue_exists_on_server(branch_issuename) == True:
+		print "Oh Dear:\n\tThe issue " + branch_issuename + " appears to exist on the server already, I don't know what you are doing but be careful!"
+		logging.warning("Issue " + branch_issuename + " exist already")
+		return
+
+	if branch_exist_remote(branch_to, repo, remote) == False:
+		print "Oh Dear:\n\tThe branch you want to merge to - " + branch_to + " - doesn't appears to exist on the server - Aborting!"
+		logging.warning("Branch " + branch_to + " doesn't exist on the server")
+		return
+
+	repo.git.branch(branch_issuename, 'gerrit_upstream_remote/' + branch_to)
+
+	if branch_exist_local(branch_issuename, repo) == False:
+		print "Oh Dear:\n\tThe creation of the branch " + branch_issuename + " failed - Aborting!"
+		logging.info("The creation of the branch " + branch_issuename + " failed")
+		return
+
+	write_config(repo, branch_issuename, "startpoint" , branch_to)
+	checkout(repo, branch_issuename)
+
+	try:
+		retval = repo.git.merge("--squash", "--no-commit", branch_from)
+	except:
+		print "Oh Dear:\n\tThe merge into the latest tip of " + branch_to + " failed." + \
+						"\n\tThe likely hood is that you need to merge in the latest changes in " + branch_to + \
+						"\n\tinto your branch or deal with the merge conflicts using git mergetool \n\n\tYou " + \
+						"are in an unclean state"
+		logging.info("Merge into latest tip of startpoint " + startpoint + " failed")
+		
+		return
+	
+	print "Merge from " + branch_from + " into " + branch_to + " was successful. Created issue " + branch_issuename
+	commithash = get_commit_hash(branch_issuename)
+
+	commitmessage = branch_issuename + " - \n# Brief summary on line above(<50 chars)\n\n" + \
+					"# Describe in detail the change below\nChange-Description:\n\n\n# Describe how to test your change below\n" + \
+				 	"Change-TestProcedure:\n\n\n# DO NOT EDIT ANYTHING BELOW HERE\n\nGerrit.startpoint:" + branch_to + \
+				 	"\n\nChange-Id: I" + commithash
+
+	logging.info("Writing commit message")
+
+	f = open(branch_issuename + '_commitmessage', 'w')
+	f.write(commitmessage)
+	f.close()
+
+	subprocess.call(['vim', branch_issuename + '_commitmessage'])
+	commitmessage = "" 
+			
+	f = file(branch_issuename + '_commitmessage', "r")
+
+	for line in f:
+		if not line.startswith("#"):
+			commitmessage = commitmessage + line
+	
+	repo.git.commit("-a", '-m', commitmessage)
+
+	f.close()
+
+				
+	print "The merge appears to be successful, please check and then push to gerrit using gerrit push"
+	
+
 #############################
 
 def review_summary(issue_name):
@@ -850,6 +999,8 @@ dispatch = {
 	'review': 		do_review,
 	'cherrypick': 	do_cherrypick,
 	'cherry-pick': 	do_cherrypick,
+	'share': 		do_share,
+	'scrunch':		do_scrunch,
 	'help':			do_help,
 }
 
