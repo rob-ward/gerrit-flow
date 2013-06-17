@@ -1032,6 +1032,12 @@ def main():
 	logging.info("Number of arguments:" + str(len(sys.argv)))
 
 	logging.info("Arguments:")
+
+	#if no commands are give show help
+	if len(sys.argv) == 1:
+		do_help(sys.argv)
+		return
+ 
 	for a in sys.argv:
 		logging.info("\t" + a)
 
