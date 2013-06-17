@@ -46,6 +46,9 @@ import webbrowser
 import random
 from git import *
 
+
+global GERRIT_FLOW_VERSION
+GERRIT_FLOW_VERSION = "0.0.1"
 #############################
 
 def get_origin_url():
@@ -971,6 +974,14 @@ def help_cherrypick():
 	"\n\n\t\tcherrypick is used to merge a given change on the server into your local branch. Please note, currently dependancy management is not done automatically"
 
 #############################	
+def help_version():
+	logging.info("entering")
+	print "\n\nversion:\n\n\tgit gerrit version <TYPE>" + \
+	"\n\n\t\tWhere <TYPE> is an output format, currrently only long and short are supported. long is default" + \
+	"\n\n\t\tUsed to print version info, if short is passed as an option then only version number is printed"
+
+
+#############################	
 
 helpmap = {
 	'cherrypick': 	help_cherrypick,
@@ -982,7 +993,10 @@ helpmap = {
 	'share': 	help_share,
 	'start': 		help_start,
 	'suck': 		help_suck,
+	'version': 		help_version,
 }
+
+#############################
 
 def do_help(argv):
 	logging.info("entering")
@@ -998,7 +1012,7 @@ def do_help(argv):
 	print "Gerrit-flow usage is as follows:"
 
 	print "\tSubcommand list is:"
-	print "\t\tcherrypick\n\t\tdraft\n\t\tpush\n\t\treview\n\t\trework\n\t\tscrunch\n\t\tshare\n\t\tstart\n\t\tsuck\n\n\tall - Shows help for all commands\n"
+	print "\t\tcherrypick\n\t\tdraft\n\t\tpush\n\t\treview\n\t\trework\n\t\tscrunch\n\t\tshare\n\t\tstart\n\t\tsuck\n\t\tversion\n\n\tall - Shows help for all commands\n"
 	
 	
 
@@ -1008,6 +1022,28 @@ def do_help(argv):
 				helpmap[c]()
 	else:
 		print "For more information run git gerrit help <COMMAND>"
+
+#############################
+
+def do_version(argv):
+	logging.info("entering")
+
+	short_mode = False
+
+	if len(argv) == 3:
+		if sys.argv[2] == "short":
+			short_mode = True
+
+	message = ""
+	if short_mode == False:
+		message = "Gerrit-flow version is - "
+
+	message = message + str(GERRIT_FLOW_VERSION)
+
+	if short_mode == False:
+		message = message + "\n\nFor usage info see git gerrit help"
+
+	print message
 
 #############################	
 
@@ -1023,6 +1059,7 @@ dispatch = {
 	'share': 		do_share,
 	'scrunch':		do_scrunch,
 	'help':			do_help,
+	'version':		do_version,
 }
 
 
