@@ -1,14 +1,5 @@
 #! /usr/bin/env python
-#
-# gerrit-flow -- Is a set of functionality to support interaction with
-# the gerrit code review tool (http://code.google.com/p/gerrit/)
-#
-# This tool supports interaction with the gerrit server in a way that
-# allows a number of workflows to be used in development.
-# 
-# Please report any bugs to or feature requests to;
-# 			https://github.com/rob-ward/gerrit-flow
-#
+
 # Copyright (c) 2013, Rob Ward
 # All rights reserved.
 #
@@ -33,6 +24,17 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
 # THE POSSIBILITY OF SUCH DAMAGE.
+
+
+# gerrit-flow -- Is a set of functionality to support interaction with
+# the gerrit code review tool (http://code.google.com/p/gerrit/)
+#
+# This tool supports interaction with the gerrit server in a way that
+# allows a number of workflows to be used in development.
+# 
+# Please report any bugs to or feature requests to;
+# 			https://github.com/rob-ward/gerrit-flow
+#
 
  
 import sys
