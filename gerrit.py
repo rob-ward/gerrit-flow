@@ -944,6 +944,26 @@ def help_review():
 	
 #############################	
 
+def help_share():
+	logging.info("entering")
+	print "\n\nshare:\n\n\tgit gerrit share" + \
+	"\n\n\tshare is used to push the current issue to a branch called share/<ISSUEID> on the gerrit server" + \
+	"\n\tThis branch can then be accessed like any other branch and shared between multiple people in order" + \
+	"\n\tto work together on a feature. This branch can then be merged onto the" + \
+	"\n\tdevelopment branches via a standard code review process\n\nSee scrunch command for more info"
+
+#############################	
+
+def help_scrunch():
+	logging.info("entering")
+	print "\n\nscrunch:\n\n\tgit gerrit scrunch <SHARED/BRANCH> <TARGETBRANCH>" + \
+	"\n\n\tWhere <SHARED/BRANCH> is the name of a branch currently shared on the gerrit server" + \
+	"\n\tWhere <TARGETBRANCH> is the name of a branch you want the changes onto i.e. master" + \
+	"\n\n\tScrunch is used to migrate a shared development brnach into a standard gerrit issue that can" + \
+	"\n\tthen be pushed to the gerrit server for review. This comman merges the branch from the SERVER not a" + \
+	"\n\tlocal copy, as such any local changes you have should be pushed to the server first.\n\nSee share command for more info" 
+
+#############################	
 def help_cherrypick():
 	logging.info("entering")
 	print "\n\n\tcherrypick:\n\n\tgit gerrit cherrypick <ISSUEID>" + \
@@ -953,14 +973,15 @@ def help_cherrypick():
 #############################	
 
 helpmap = {
-	'start': 		help_start,
+	'cherrypick': 	help_cherrypick,
 	'draft':		help_draft,
 	'push': 		help_push,
-	'rework': 		help_rework,
-	'suck': 		help_suck,
 	'review': 		help_review,
-	'cherrypick': 	help_cherrypick,
-	'cherry-pick': 	help_cherrypick,
+	'rework': 		help_rework,
+	'scrunch':	help_scrunch,
+	'share': 	help_share,
+	'start': 		help_start,
+	'suck': 		help_suck,
 }
 
 def do_help(argv):
@@ -977,7 +998,7 @@ def do_help(argv):
 	print "Gerrit-flow usage is as follows:"
 
 	print "\tSubcommand list is:"
-	print "\t\tstart\n\t\tdraft\n\t\tpush\n\t\trework\n\t\tsuck\n\t\treview\n\t\tcherrypick\n\t\tall"
+	print "\t\tcherrypick\n\t\tdraft\n\t\tpush\n\t\treview\n\t\trework\n\t\tscrunch\n\t\tshare\n\t\tstart\n\t\tsuck\n\n\tall - Shows help for all commands\n"
 	
 	
 
