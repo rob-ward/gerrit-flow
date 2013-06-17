@@ -190,7 +190,7 @@ def get_commit_hash(issue_name):
 	
 	logging.info("Issue name =" + issue_name)
 		
-	commithash = hashlib.new('ripemd160')
+	commithash = hashlib.sha1()
 	commithash.update(issue_name)
 	
 	logging.info("Commit Hash = I" + commithash.hexdigest())
