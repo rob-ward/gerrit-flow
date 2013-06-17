@@ -281,13 +281,13 @@ def do_start(argv):
 				write_config(repo, issueid, "startpoint" , startpoint)
 				checkout(repo, issueid)
 				print("You are now checkedout on " + issueid)
-				logging.info("Brnach creation was succesful")
+				logging.info("Branch creation was succesful")
 			else:
 				logging.info("Branch creation Failed")
 
 		else:
 			print "Oh Dear:\n\tA local branch called " + issueid + " exists!.\n\tAs such we cannot start a new instance for this issue."
-			logging.info("Local brnach already exists")
+			logging.info("Local branch already exists")
 
 #############################
 
@@ -319,7 +319,7 @@ def submit(repo, ref, append):
 				logging.info("Reset head --hard")
 				repo.git.reset("--hard", "HEAD")
 				issueid.checkout()
-				logging.info("Deleting brnach " + issueid.name + append)
+				logging.info("Deleting branch " + issueid.name + append)
 				repo.git.branch("-D", issueid.name + append)
 				return
 		
@@ -373,8 +373,8 @@ def submit(repo, ref, append):
 				print "Oh Dear: \n\tYou don't seem to have commited any changes, make\n\tsure you have saved your files, and committed them!!"
 				failed = True
 			issueid.checkout()
-			logging.info("Checked out original brnach")
-			logging.info("Deleting brnach " + issueid.name + append)
+			logging.info("Checked out original branch")
+			logging.info("Deleting branch " + issueid.name + append)
 			repo.git.branch("-D", issueid.name + append)
 			if failed == False:
 				print "Successfully pushed to Gerrit server"
@@ -481,7 +481,7 @@ def do_rework(argv):
 				logging.info("checkout -b " + issue_name)
 				if(repo.active_branch.name != issue_name):
 					print "Oh Dear:\n\tCheckout of the new branch failed. Please clean the git repo and try again!"
-					logging.info("Failed to checkout brnach " + issue_name)
+					logging.info("Failed to checkout branch " + issue_name)
 				else:
 					print "You are now on branch " + issue_name
 					logging.info("Checked out " + issue_name)
@@ -510,15 +510,15 @@ def do_rework(argv):
 				write_config(repo, issue_name, "startpoint" , startpoint)
 			else:
 				print "Oh Dear: You have requested a merge but the branch doesn't currently exist locally."
-				logging.info("Merge requested but brnach doesn't exist")
+				logging.info("Merge requested but branch doesn't exist")
 		else:
-			# brnach exists
+			# branch exists
 			if mergechanges == False:
 				print "Oh Dear:\n\tIt appears that the creation of the new branch " + issue_name + " can't \n\thappen " + \
 				"due to a branch with this name already existing. If you want to" + \
 				"\n\tmerge the changes onto that branch then run git gerrit rework ISSUEID merge" + \
 				"\n\tPlease remove this branch and try again!"
-				logging.info("Brnach name seems to exist so can't create")
+				logging.info("Branch name seems to exist so can't create")
 			else:
 				logging.info("checkout " + issue_name)
 				repo.git.checkout(issue_name)
@@ -571,7 +571,7 @@ def do_suck(argv):
 				"due to a branch with this name already existing. If you want to" + \
 				"\n\tmerge the changes onto that branch then run git gerrit rework ISSUEID merge" + \
 				"\n\tPlease remove this branch and try again!"
-		logging.info("brnach called " + issue_name + "_suck already exists")
+		logging.info("branch called " + issue_name + "_suck already exists")
 
 
 #############################	
@@ -606,7 +606,7 @@ def do_share(argv):
 		logging.warning("Share - " + share_name + " already exists")
 		return
 
-	#Move the brnach to a share version
+	#Move the branch to a share version
 	repo.git.branch("-m", issueid, share_name)
 	repo.git.push("origin", share_name)
 
@@ -899,7 +899,7 @@ def help_start():
 	print "\n\nstart:\n\n\tgit gerrit start <ISSUEID> (STARTPOINT)" + \
 	"\n\n\tWhere <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine" + \
 	"\n\n\tWhere (STARTPOINT) is an optional argument dictating which branch you are developing on, the default unless set in a config file is master"
-	"\n\n\tStart is used to setup a new set of changes, this creates a brnach and puts tracking information in your configuration"
+	"\n\n\tStart is used to setup a new set of changes, this creates a branch and puts tracking information in your configuration"
 
 #############################	
 
@@ -922,7 +922,7 @@ def help_rework():
 	logging.info("entering")
 	print "\n\nrework:\n\n\tgit gerrit rework <ISSUEID>" + \
 	"\n\n\tWhere <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine" + \
-	"\n\n\trework will create you a brnach called <ISSUEID> where you can make any changes you require and push" + \
+	"\n\n\trework will create you a branch called <ISSUEID> where you can make any changes you require and push" + \
 	"\n\tthem back to the server, this allows you to take control of a change already pushed by someopne else or" + \
 	"\n\treclaim a change if someone else has worked on it"
 #############################	
@@ -965,7 +965,7 @@ def help_scrunch():
 	print "\n\nscrunch:\n\n\tgit gerrit scrunch <SHARED/BRANCH> <TARGETBRANCH>" + \
 	"\n\n\tWhere <SHARED/BRANCH> is the name of a branch currently shared on the gerrit server" + \
 	"\n\tWhere <TARGETBRANCH> is the name of a branch you want the changes onto i.e. master" + \
-	"\n\n\tScrunch is used to migrate a shared development brnach into a standard gerrit issue that can" + \
+	"\n\n\tScrunch is used to migrate a shared development branch into a standard gerrit issue that can" + \
 	"\n\tthen be pushed to the gerrit server for review. This comman merges the branch from the SERVER not a" + \
 	"\n\tlocal copy, as such any local changes you have should be pushed to the server first.\n\nSee share command for more info" 
 
