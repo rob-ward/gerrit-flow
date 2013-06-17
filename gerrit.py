@@ -51,7 +51,7 @@ from git import *
 
 
 global GERRIT_FLOW_VERSION
-GERRIT_FLOW_VERSION = "0.0.1"
+GERRIT_FLOW_VERSION = "0.0.1P"
 #############################
 
 def get_origin_url():
