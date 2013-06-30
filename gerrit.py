@@ -36,6 +36,7 @@
 # 			https://github.com/rob-ward/gerrit-flow
 #
 
+
  
 import sys
 import os
@@ -48,6 +49,9 @@ import webbrowser
 import random
 from git import *
 
+
+global GERRIT_FLOW_VERSION
+GERRIT_FLOW_VERSION = "0.0.1"
 #############################
 
 def get_origin_url():
@@ -61,6 +65,11 @@ def get_origin_url():
 def get_server_hostname(url):
 	logging.info("entering")
 	start = url.find("@")
+	if start == -1:
+		#we need to handle urls without a username
+		start = url.find(":")
+		start = start + 2 # miss the //
+
 	url = url[start + 1:]
 	end = url.find(":")
 	hostname = url[:end]
@@ -181,7 +190,7 @@ def get_commit_hash(issue_name):
 	
 	logging.info("Issue name =" + issue_name)
 		
-	commithash = hashlib.new('ripemd160')
+	commithash = hashlib.sha1()
 	commithash.update(issue_name)
 	
 	logging.info("Commit Hash = I" + commithash.hexdigest())
@@ -272,13 +281,13 @@ def do_start(argv):
 				write_config(repo, issueid, "startpoint" , startpoint)
 				checkout(repo, issueid)
 				print("You are now checkedout on " + issueid)
-				logging.info("Brnach creation was succesful")
+				logging.info("Branch creation was succesful")
 			else:
 				logging.info("Branch creation Failed")
 
 		else:
 			print "Oh Dear:\n\tA local branch called " + issueid + " exists!.\n\tAs such we cannot start a new instance for this issue."
-			logging.info("Local brnach already exists")
+			logging.info("Local branch already exists")
 
 #############################
 
@@ -299,6 +308,7 @@ def submit(repo, ref, append):
 	else:
 			failed = False
 			retval = repo.git.branch(issueid.name + append, 'gerrit_upstream_remote/' + startpoint)
+			print "\nCreating patchset for submition... Please Standby...\n"
 			retval = checkout(repo, issueid.name + append)
 			try:
 				retval = repo.git.merge("--squash", "--no-commit", issueid)
@@ -310,7 +320,7 @@ def submit(repo, ref, append):
 				logging.info("Reset head --hard")
 				repo.git.reset("--hard", "HEAD")
 				issueid.checkout()
-				logging.info("Deleting brnach " + issueid.name + append)
+				logging.info("Deleting branch " + issueid.name + append)
 				repo.git.branch("-D", issueid.name + append)
 				return
 		
@@ -320,16 +330,20 @@ def submit(repo, ref, append):
 			hostname = get_server_hostname(url)
 			port = get_server_port(url)
 			
+			print"\n\nContacting server to confirm that no current commit amssage is present, Standby..."
+			
 			commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "change:I" + commithash ])
 			if commitmessage.find('"rowCount":0') >= 0:
+				print "\nGenerating default commit message."
 				# we don't have so a commit message
 				logging.info("No commit message exists so making one")
-				commitmessage = issueid.name + " - \n# Brief summary on line above(<50 chars)\n\n" + \
+				commitmessage = issueid.name + " - \n# Brief summary on line above(<50 chars)\n\n\n" + \
 					"# Describe in detail the change below\nChange-Description:\n\n\n# Describe how to test your change below\n" + \
 				 	"Change-TestProcedure:\n\n\n# DO NOT EDIT ANYTHING BELOW HERE\n\nGerrit.startpoint:" + startpoint + \
 				 	"\n\nChange-Id:I" + commithash
 			else:
-				# we have a commit message be we have to paarse if from json
+				# we have a commit message be we have to parse if from json
+				#todo why is this not in proper json????
 				logging.info("We have a commit message")
 				start = commitmessage.find(',"commitMessage":"')
 				start = start + 18
@@ -352,20 +366,24 @@ def submit(repo, ref, append):
 				if not line.startswith("#"):
 					commitmessage = commitmessage + line
 	
-			
+			print "Commiting you change to local git history"
 			repo.git.commit("-a", '-m', commitmessage)
 			try:
+				print "Attempting to push change to the gerrit server, Please Standby...
 				retval = subprocess.check_output(["git", "push", "gerrit_upstream_remote", ref + startpoint], stderr=subprocess.STDOUT)
 			except subprocess.CalledProcessError as e:
 				retval = e.output
 			
+			#we want the output so print
+			print retval
+
 			if retval.find("(no changes made)") >= 0:
 				logging.info("o cahnges made")
 				print "Oh Dear: \n\tYou don't seem to have commited any changes, make\n\tsure you have saved your files, and committed them!!"
 				failed = True
 			issueid.checkout()
-			logging.info("Checked out original brnach")
-			logging.info("Deleting brnach " + issueid.name + append)
+			logging.info("Checked out original branch")
+			logging.info("Deleting branch " + issueid.name + append)
 			repo.git.branch("-D", issueid.name + append)
 			if failed == False:
 				print "Successfully pushed to Gerrit server"
@@ -472,7 +490,7 @@ def do_rework(argv):
 				logging.info("checkout -b " + issue_name)
 				if(repo.active_branch.name != issue_name):
 					print "Oh Dear:\n\tCheckout of the new branch failed. Please clean the git repo and try again!"
-					logging.info("Failed to checkout brnach " + issue_name)
+					logging.info("Failed to checkout branch " + issue_name)
 				else:
 					print "You are now on branch " + issue_name
 					logging.info("Checked out " + issue_name)
@@ -501,15 +519,15 @@ def do_rework(argv):
 				write_config(repo, issue_name, "startpoint" , startpoint)
 			else:
 				print "Oh Dear: You have requested a merge but the branch doesn't currently exist locally."
-				logging.info("Merge requested but brnach doesn't exist")
+				logging.info("Merge requested but branch doesn't exist")
 		else:
-			# brnach exists
+			# branch exists
 			if mergechanges == False:
 				print "Oh Dear:\n\tIt appears that the creation of the new branch " + issue_name + " can't \n\thappen " + \
 				"due to a branch with this name already existing. If you want to" + \
 				"\n\tmerge the changes onto that branch then run git gerrit rework ISSUEID merge" + \
 				"\n\tPlease remove this branch and try again!"
-				logging.info("Brnach name seems to exist so can't create")
+				logging.info("Branch name seems to exist so can't create")
 			else:
 				logging.info("checkout " + issue_name)
 				repo.git.checkout(issue_name)
@@ -562,7 +580,156 @@ def do_suck(argv):
 				"due to a branch with this name already existing. If you want to" + \
 				"\n\tmerge the changes onto that branch then run git gerrit rework ISSUEID merge" + \
 				"\n\tPlease remove this branch and try again!"
-		logging.info("brnach called " + issue_name + "_suck already exists")
+		logging.info("branch called " + issue_name + "_suck already exists")
+
+
+#############################	
+
+def do_share(argv):
+	logging.info("entering")
+	repo = Repo(os.getcwd())
+	if repo.is_dirty() == True:
+		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		logging.warning("Repo Dirty")
+		return
+	
+	url = get_origin_url()
+	hostname = get_server_hostname(url)
+	port = get_server_port(url)
+
+	issueid = repo.active_branch
+	
+	remote = create_remote(repo)
+  
+	share_name = "share/" + issueid.name
+
+	# we need to check that we aren't on a share branch, we don't want share/share/share....
+	if issueid.name[:6] == "share/":
+		print "Oh Dear:\n\tIt appears that the branch you are on is already a share!!"
+		logging.warning("Share - " + share_name + " is already a share")
+		return
+				
+	#Check that share/<ISSUEID> doesn't exists, if it does error as we can't have two
+	if branch_exist(share_name, repo, remote) == True:
+		print "Oh Dear:\n\tShare " + share_name + " already exists"
+		logging.warning("Share - " + share_name + " already exists")
+		return
+
+	#Move the branch to a share version
+	repo.git.branch("-m", issueid, share_name)
+	repo.git.push("origin", share_name)
+
+	try:
+		retval =  subprocess.check_output(["git", "push", "gerrit_upstream_remote", share_name], stderr=subprocess.STDOUT)
+	except subprocess.CalledProcessError as e:
+		retval = e.output
+
+	print retval
+	
+#############################	
+
+def do_scrunch(argv):
+	logging.info("entering")
+	repo = Repo(os.getcwd())
+
+	if repo.is_dirty() == True:
+		print "Oh Dear:\n\tYour repo is dirty(changed files, unresolved merges etc.\n\n\tPlease resolve these and try again."
+		logging.warning("Repo Dirty")
+		return
+
+	
+	if len(argv) != 4:
+		print "Oh Dear:\n\tScrunch only supports a command with a branch in the form share/ISSUEID and a merge to branch " + \
+      "after it, please see help for more info!"
+		logging.warning("Scrunch - didn't provide branch from and branch to")
+		return
+
+	url = get_origin_url()
+	hostname = get_server_hostname(url)
+	port = get_server_port(url)
+	
+	branch_from = argv[2]
+	branch_to = argv[3]
+
+	branch_issuename = branch_from[6:]
+
+	remote = create_remote(repo)
+  
+	#We take files to merge from the server so it must exist
+	if branch_exist_remote(branch_from, repo, remote) == False:
+		print "Oh Dear:\n\tBranch " + branch_from + " does not exist on the gerrit server, we will only merge from the server!!!"
+		logging.warning("Branch " + branch_from + " does not exist on server for scrunching")
+		return
+
+	print "Using branch " + branch_from + " from server"
+
+	if branch_exist_local(branch_issuename, repo) == True:
+		print "Oh Dear:\n\tA local branch called " + branch_issuename + " exists, we cannot scrunch while it exists!"
+		logging.warning("Branch " + branch_issuename + " exist locally")
+		return
+
+   
+	if issue_exists_on_server(branch_issuename) == True:
+		print "Oh Dear:\n\tThe issue " + branch_issuename + " appears to exist on the server already, I don't know what you are doing but be careful!"
+		logging.warning("Issue " + branch_issuename + " exist already")
+		return
+
+	if branch_exist_remote(branch_to, repo, remote) == False:
+		print "Oh Dear:\n\tThe branch you want to merge to - " + branch_to + " - doesn't appears to exist on the server - Aborting!"
+		logging.warning("Branch " + branch_to + " doesn't exist on the server")
+		return
+
+	repo.git.branch(branch_issuename, 'gerrit_upstream_remote/' + branch_to)
+
+	if branch_exist_local(branch_issuename, repo) == False:
+		print "Oh Dear:\n\tThe creation of the branch " + branch_issuename + " failed - Aborting!"
+		logging.info("The creation of the branch " + branch_issuename + " failed")
+		return
+
+	write_config(repo, branch_issuename, "startpoint" , branch_to)
+	checkout(repo, branch_issuename)
+
+	try:
+		retval = repo.git.merge("--squash", "--no-commit", branch_from)
+	except:
+		print "Oh Dear:\n\tThe merge into the latest tip of " + branch_to + " failed." + \
+						"\n\tThe likely hood is that you need to merge in the latest changes in " + branch_to + \
+						"\n\tinto your branch or deal with the merge conflicts using git mergetool \n\n\tYou " + \
+						"are in an unclean state"
+		logging.info("Merge into latest tip of startpoint " + startpoint + " failed")
+		
+		return
+	
+	print "Merge from " + branch_from + " into " + branch_to + " was successful. Created issue " + branch_issuename
+	commithash = get_commit_hash(branch_issuename)
+
+	commitmessage = branch_issuename + " - \n# Brief summary on line above(<50 chars)\n\n" + \
+					"# Describe in detail the change below\nChange-Description:\n\n\n# Describe how to test your change below\n" + \
+				 	"Change-TestProcedure:\n\n\n# DO NOT EDIT ANYTHING BELOW HERE\n\nGerrit.startpoint:" + branch_to + \
+				 	"\n\nChange-Id: I" + commithash
+
+	logging.info("Writing commit message")
+
+	f = open(branch_issuename + '_commitmessage', 'w')
+	f.write(commitmessage)
+	f.close()
+
+	subprocess.call(['vim', branch_issuename + '_commitmessage'])
+	commitmessage = "" 
+			
+	f = file(branch_issuename + '_commitmessage', "r")
+
+	for line in f:
+		if not line.startswith("#"):
+			commitmessage = commitmessage + line
+	
+	repo.git.commit("-a", '-m', commitmessage)
+
+	f.close()
+
+				
+	print "The merge appears to be successful, please check and then push to gerrit using gerrit push"
+	
 
 #############################
 
@@ -741,7 +908,7 @@ def help_start():
 	print "\n\nstart:\n\n\tgit gerrit start <ISSUEID> (STARTPOINT)" + \
 	"\n\n\tWhere <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine" + \
 	"\n\n\tWhere (STARTPOINT) is an optional argument dictating which branch you are developing on, the default unless set in a config file is master"
-	"\n\n\tStart is used to setup a new set of changes, this creates a brnach and puts tracking information in your configuration"
+	"\n\n\tStart is used to setup a new set of changes, this creates a branch and puts tracking information in your configuration"
 
 #############################	
 
@@ -764,7 +931,7 @@ def help_rework():
 	logging.info("entering")
 	print "\n\nrework:\n\n\tgit gerrit rework <ISSUEID>" + \
 	"\n\n\tWhere <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine" + \
-	"\n\n\trework will create you a brnach called <ISSUEID> where you can make any changes you require and push" + \
+	"\n\n\trework will create you a branch called <ISSUEID> where you can make any changes you require and push" + \
 	"\n\tthem back to the server, this allows you to take control of a change already pushed by someopne else or" + \
 	"\n\treclaim a change if someone else has worked on it"
 #############################	
@@ -792,6 +959,26 @@ def help_review():
 	
 #############################	
 
+def help_share():
+	logging.info("entering")
+	print "\n\nshare:\n\n\tgit gerrit share" + \
+	"\n\n\tshare is used to push the current issue to a branch called share/<ISSUEID> on the gerrit server" + \
+	"\n\tThis branch can then be accessed like any other branch and shared between multiple people in order" + \
+	"\n\tto work together on a feature. This branch can then be merged onto the" + \
+	"\n\tdevelopment branches via a standard code review process\n\nSee scrunch command for more info"
+
+#############################	
+
+def help_scrunch():
+	logging.info("entering")
+	print "\n\nscrunch:\n\n\tgit gerrit scrunch <SHARED/BRANCH> <TARGETBRANCH>" + \
+	"\n\n\tWhere <SHARED/BRANCH> is the name of a branch currently shared on the gerrit server" + \
+	"\n\tWhere <TARGETBRANCH> is the name of a branch you want the changes onto i.e. master" + \
+	"\n\n\tScrunch is used to migrate a shared development branch into a standard gerrit issue that can" + \
+	"\n\tthen be pushed to the gerrit server for review. This comman merges the branch from the SERVER not a" + \
+	"\n\tlocal copy, as such any local changes you have should be pushed to the server first.\n\nSee share command for more info" 
+
+#############################	
 def help_cherrypick():
 	logging.info("entering")
 	print "\n\n\tcherrypick:\n\n\tgit gerrit cherrypick <ISSUEID>" + \
@@ -799,17 +986,29 @@ def help_cherrypick():
 	"\n\n\t\tcherrypick is used to merge a given change on the server into your local branch. Please note, currently dependancy management is not done automatically"
 
 #############################	
+def help_version():
+	logging.info("entering")
+	print "\n\nversion:\n\n\tgit gerrit version <TYPE>" + \
+	"\n\n\t\tWhere <TYPE> is an output format, currrently only long and short are supported. long is default" + \
+	"\n\n\t\tUsed to print version info, if short is passed as an option then only version number is printed"
+
+
+#############################	
 
 helpmap = {
-	'start': 		help_start,
+	'cherrypick': 	help_cherrypick,
 	'draft':		help_draft,
 	'push': 		help_push,
-	'rework': 		help_rework,
-	'suck': 		help_suck,
 	'review': 		help_review,
-	'cherrypick': 	help_cherrypick,
-	'cherry-pick': 	help_cherrypick,
+	'rework': 		help_rework,
+	'scrunch':	help_scrunch,
+	'share': 	help_share,
+	'start': 		help_start,
+	'suck': 		help_suck,
+	'version': 		help_version,
 }
+
+#############################
 
 def do_help(argv):
 	logging.info("entering")
@@ -825,7 +1024,7 @@ def do_help(argv):
 	print "Gerrit-flow usage is as follows:"
 
 	print "\tSubcommand list is:"
-	print "\t\tstart\n\t\tdraft\n\t\tpush\n\t\trework\n\t\tsuck\n\t\treview\n\t\tcherrypick\n\t\tall"
+	print "\t\tcherrypick\n\t\tdraft\n\t\tpush\n\t\treview\n\t\trework\n\t\tscrunch\n\t\tshare\n\t\tstart\n\t\tsuck\n\t\tversion\n\n"
 	
 	
 
@@ -834,7 +1033,30 @@ def do_help(argv):
 			for c in helpmap:
 				helpmap[c]()
 	else:
-		print "For more information run git gerrit help <COMMAND>"
+		print "For more information run 'git gerrit help <COMMAND>'"
+		print "Run 'git gerrit help all' for help output of all gerrit-flow comamnds"
+
+#############################
+
+def do_version(argv):
+	logging.info("entering")
+
+	short_mode = False
+
+	if len(argv) == 3:
+		if sys.argv[2] == "short":
+			short_mode = True
+
+	message = ""
+	if short_mode == False:
+		message = "Gerrit-flow version is - "
+
+	message = message + str(GERRIT_FLOW_VERSION)
+
+	if short_mode == False:
+		message = message + "\n\nFor usage info see git gerrit help"
+
+	print message
 
 #############################	
 
@@ -847,7 +1069,10 @@ dispatch = {
 	'review': 		do_review,
 	'cherrypick': 	do_cherrypick,
 	'cherry-pick': 	do_cherrypick,
+	'share': 		do_share,
+	'scrunch':		do_scrunch,
 	'help':			do_help,
+	'version':		do_version,
 }
 
 
@@ -857,6 +1082,12 @@ def main():
 	logging.info("Number of arguments:" + str(len(sys.argv)))
 
 	logging.info("Arguments:")
+
+	#if no commands are give show help
+	if len(sys.argv) == 1:
+		do_help(sys.argv)
+		return
+ 
 	for a in sys.argv:
 		logging.info("\t" + a)
 
