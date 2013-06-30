@@ -308,6 +308,7 @@ def submit(repo, ref, append):
 	else:
 			failed = False
 			retval = repo.git.branch(issueid.name + append, 'gerrit_upstream_remote/' + startpoint)
+			print "\nCreating patchset for submition... Please Standby...\n"
 			retval = checkout(repo, issueid.name + append)
 			try:
 				retval = repo.git.merge("--squash", "--no-commit", issueid)
@@ -329,16 +330,20 @@ def submit(repo, ref, append):
 			hostname = get_server_hostname(url)
 			port = get_server_port(url)
 			
+			print"\n\nContacting server to confirm that no current commit amssage is present, Standby..."
+			
 			commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "change:I" + commithash ])
 			if commitmessage.find('"rowCount":0') >= 0:
+				print "\nGenerating default commit message."
 				# we don't have so a commit message
 				logging.info("No commit message exists so making one")
-				commitmessage = issueid.name + " - \n# Brief summary on line above(<50 chars)\n\n" + \
+				commitmessage = issueid.name + " - \n# Brief summary on line above(<50 chars)\n\n\n" + \
 					"# Describe in detail the change below\nChange-Description:\n\n\n# Describe how to test your change below\n" + \
 				 	"Change-TestProcedure:\n\n\n# DO NOT EDIT ANYTHING BELOW HERE\n\nGerrit.startpoint:" + startpoint + \
 				 	"\n\nChange-Id:I" + commithash
 			else:
-				# we have a commit message be we have to paarse if from json
+				# we have a commit message be we have to parse if from json
+				#todo why is this not in proper json????
 				logging.info("We have a commit message")
 				start = commitmessage.find(',"commitMessage":"')
 				start = start + 18
@@ -361,9 +366,10 @@ def submit(repo, ref, append):
 				if not line.startswith("#"):
 					commitmessage = commitmessage + line
 	
-			
+			print "Commiting you change to local git history"
 			repo.git.commit("-a", '-m', commitmessage)
 			try:
+				print "Attempting to push change to the gerrit server, Please Standby...
 				retval = subprocess.check_output(["git", "push", "gerrit_upstream_remote", ref + startpoint], stderr=subprocess.STDOUT)
 			except subprocess.CalledProcessError as e:
 				retval = e.output
@@ -1018,7 +1024,7 @@ def do_help(argv):
 	print "Gerrit-flow usage is as follows:"
 
 	print "\tSubcommand list is:"
-	print "\t\tcherrypick\n\t\tdraft\n\t\tpush\n\t\treview\n\t\trework\n\t\tscrunch\n\t\tshare\n\t\tstart\n\t\tsuck\n\t\tversion\n\n\tall - Shows help for all commands\n"
+	print "\t\tcherrypick\n\t\tdraft\n\t\tpush\n\t\treview\n\t\trework\n\t\tscrunch\n\t\tshare\n\t\tstart\n\t\tsuck\n\t\tversion\n\n"
 	
 	
 
@@ -1027,7 +1033,8 @@ def do_help(argv):
 			for c in helpmap:
 				helpmap[c]()
 	else:
-		print "For more information run git gerrit help <COMMAND>"
+		print "For more information run 'git gerrit help <COMMAND>'"
+		print "Run 'git gerrit help all' for help output of all gerrit-flow comamnds"
 
 #############################
 
