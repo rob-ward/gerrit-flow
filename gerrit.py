@@ -308,7 +308,7 @@ def submit(repo, ref, append):
 	else:
 			failed = False
 			retval = repo.git.branch(issueid.name + append, 'gerrit_upstream_remote/' + startpoint)
-			print "\nCreating patchset for submition... Please Standby...\n"
+			print "\nCreating patchset for submittion... Please Stand By...\n"
 			retval = checkout(repo, issueid.name + append)
 			try:
 				retval = repo.git.merge("--squash", "--no-commit", issueid)
@@ -330,11 +330,11 @@ def submit(repo, ref, append):
 			hostname = get_server_hostname(url)
 			port = get_server_port(url)
 			
-			print"\n\nContacting server to confirm that no current commit amssage is present, Standby..."
+			print"Contacting server to confirm that no current commit message is present, Standby...\n"
 			
 			commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "change:I" + commithash ])
 			if commitmessage.find('"rowCount":0') >= 0:
-				print "\nGenerating default commit message."
+				print "Generating default commit message.\n\n"
 				# we don't have so a commit message
 				logging.info("No commit message exists so making one")
 				commitmessage = issueid.name + " - \n# Brief summary on line above(<50 chars)\n\n\n" + \
@@ -366,10 +366,10 @@ def submit(repo, ref, append):
 				if not line.startswith("#"):
 					commitmessage = commitmessage + line
 	
-			print "Commiting you change to local git history"
+			print "Commiting you change to local git history.\n"
 			repo.git.commit("-a", '-m', commitmessage)
 			try:
-				print "Attempting to push change to the gerrit server, Please Standby...
+				print "Attempting to push change to the gerrit server, Please Stand By...\n"
 				retval = subprocess.check_output(["git", "push", "gerrit_upstream_remote", ref + startpoint], stderr=subprocess.STDOUT)
 			except subprocess.CalledProcessError as e:
 				retval = e.output
@@ -378,7 +378,7 @@ def submit(repo, ref, append):
 			print retval
 
 			if retval.find("(no changes made)") >= 0:
-				logging.info("o cahnges made")
+				logging.info("No changes made")
 				print "Oh Dear: \n\tYou don't seem to have commited any changes, make\n\tsure you have saved your files, and committed them!!"
 				failed = True
 			issueid.checkout()
@@ -965,7 +965,7 @@ def help_share():
 	"\n\n\tshare is used to push the current issue to a branch called share/<ISSUEID> on the gerrit server" + \
 	"\n\tThis branch can then be accessed like any other branch and shared between multiple people in order" + \
 	"\n\tto work together on a feature. This branch can then be merged onto the" + \
-	"\n\tdevelopment branches via a standard code review process\n\nSee scrunch command for more info"
+	"\n\tdevelopment branches via a standard code review process\n\n\tSee scrunch command for more info"
 
 #############################	
 
@@ -976,21 +976,21 @@ def help_scrunch():
 	"\n\tWhere <TARGETBRANCH> is the name of a branch you want the changes onto i.e. master" + \
 	"\n\n\tScrunch is used to migrate a shared development branch into a standard gerrit issue that can" + \
 	"\n\tthen be pushed to the gerrit server for review. This comman merges the branch from the SERVER not a" + \
-	"\n\tlocal copy, as such any local changes you have should be pushed to the server first.\n\nSee share command for more info" 
+	"\n\tlocal copy, as such any local changes you have should be pushed to the server first.\n\n\tSee share command for more info" 
 
 #############################	
 def help_cherrypick():
 	logging.info("entering")
-	print "\n\n\tcherrypick:\n\n\tgit gerrit cherrypick <ISSUEID>" + \
-	"\n\n\t\tWhere <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine" + \
-	"\n\n\t\tcherrypick is used to merge a given change on the server into your local branch. Please note, currently dependancy management is not done automatically"
+	print "\n\ncherrypick:\n\n\tgit gerrit cherrypick <ISSUEID>" + \
+	"\n\n\tWhere <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine" + \
+	"\n\n\tcherrypick is used to merge a given change on the server into your local branch. Please note, currently dependancy management is not done automatically"
 
 #############################	
 def help_version():
 	logging.info("entering")
 	print "\n\nversion:\n\n\tgit gerrit version <TYPE>" + \
-	"\n\n\t\tWhere <TYPE> is an output format, currrently only long and short are supported. long is default" + \
-	"\n\n\t\tUsed to print version info, if short is passed as an option then only version number is printed"
+	"\n\n\tWhere <TYPE> is an output format, currrently only long and short are supported. long is default" + \
+	"\n\n\tUsed to print version info, if short is passed as an option then only version number is printed"
 
 
 #############################	

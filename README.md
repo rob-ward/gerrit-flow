@@ -55,7 +55,6 @@ Install dependacies using:
 
 Gerrit-flow Usage
 ------------------
-
 	Subcommand list is:
 		cherrypick
 		draft
@@ -68,7 +67,6 @@ Gerrit-flow Usage
 		suck
 		version
 
-	all - Shows help for all commands
 
 
 
@@ -114,7 +112,7 @@ scrunch:
 	then be pushed to the gerrit server for review. This comman merges the branch from the SERVER not a
 	local copy, as such any local changes you have should be pushed to the server first.
 
-See share command for more info
+	See share command for more info
 
 
 draft:
@@ -128,9 +126,9 @@ version:
 
 	git gerrit version <TYPE>
 
-		Where <TYPE> is an output format, currrently only long and short are supported. long is default
+	Where <TYPE> is an output format, currrently only long and short are supported. long is default
 
-		Used to print version info, if short is passed as an option then only version number is printed
+	Used to print version info, if short is passed as an option then only version number is printed
 
 
 push:
@@ -141,13 +139,13 @@ push:
 	workflow you will likely need to add reviewers to the issue after pushing
 
 
-	cherrypick:
+cherrypick:
 
 	git gerrit cherrypick <ISSUEID>
 
-		Where <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine
+	Where <ISSUEID> is a unique id, this is normally taken from an issue control system such as redmine
 
-		cherrypick is used to merge a given change on the server into your local branch. Please note, currently dependancy management is not done automatically
+	cherrypick is used to merge a given change on the server into your local branch. Please note, currently dependancy management is not done automatically
 
 
 share:
@@ -159,7 +157,7 @@ share:
 	to work together on a feature. This branch can then be merged onto the
 	development branches via a standard code review process
 
-See scrunch command for more info
+	See scrunch command for more info
 
 
 review:
@@ -175,5 +173,3 @@ review:
 			tool - This will show you the delta in a GUI tool
 
 	review is primarily used for getting information about a change, the default review command will take you to the gerrit review page i.e. web mode
-
-
