@@ -334,7 +334,7 @@ def submit(repo, ref, append):
 			
 			commitmessage = subprocess.check_output(['ssh', hostname, "-p", port, "gerrit", "query", "--format", "JSON", "--commit-message", "change:I" + commithash ])
 			if commitmessage.find('"rowCount":0') >= 0:
-				print "Generating default commit message.\n\n"
+				print "Generating default commit message.\n"
 				# we don't have so a commit message
 				logging.info("No commit message exists so making one")
 				commitmessage = issueid.name + " - \n# Brief summary on line above(<50 chars)\n\n\n" + \
