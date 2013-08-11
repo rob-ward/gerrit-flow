@@ -994,6 +994,38 @@ def help_version():
 
 #############################    
 
+#############################    
+def help_update():
+    logging.info("entering")
+    print "\n\nupdate:\n\n\tgit gerrit update [ --reset --no-merge ]" + \
+    "\n\n\tUpdates the current poject to match the manifest, this will move any repos to the versions specified in" + \
+    "\n\tthe manifest, or the latest where a manifest references a branch. This is done my auto merging any upstream" + \
+    "\n\tchanges into you currently checked out branch" + \
+    "\n\n\t --reset is used to revert all branches back to the upstream master, if you have any un committed changes" + \
+    "\n\t on a branch it will abort" + \
+    "\n\n\t --no-merge is used to update all repos you are not activly editing, only a Fast-forward will be done" + \
+    "\n\n\t --reset and --no-merge are mutually exclusive"
+
+
+#############################    
+def help_clone():
+    logging.info("entering")
+    print "\n\nclone:\n\n\tgit gerrit clone <TYPE>" + \
+    "\n\n\tWhere <TYPE> is an output format, currrently only long and short are supported. long is default" + \
+    "\n\n\tUsed to print version info, if short is passed as an option then only version number is printed"
+
+
+#############################    
+def help_edman():
+    logging.info("entering")
+    print "\n\nedman:\n\n\tgit gerrit edman [ --reset --no-merge ]" + \
+    "\n\n\tUsed to edit the manifest for the project. Once the manifest is edited the project will be updated" + \
+    "\n\n\tSee update command for more info"
+
+
+#############################   
+
+
 helpmap = {
     'cherrypick':     help_cherrypick,
     'draft':        help_draft,
@@ -1005,6 +1037,9 @@ helpmap = {
     'start':         help_start,
     'suck':         help_suck,
     'version':         help_version,
+    'update':         help_update,
+    'clone':         help_clone,
+    'edman':         help_edman,
 }
 
 #############################
@@ -1059,6 +1094,34 @@ def do_version(argv):
 
 #############################    
 
+
+#############################
+
+def do_update(argv):
+    logging.info("entering")
+
+   
+
+#############################   
+
+#############################
+
+def do_clone(argv):
+    logging.info("entering")
+
+   
+
+#############################   
+
+#############################
+
+def do_edman(argv):
+    logging.info("entering")
+
+   
+
+#############################   
+
 dispatch = {
     'start':         do_start,
     'draft':        do_draft,
@@ -1072,6 +1135,9 @@ dispatch = {
     'scrunch':        do_scrunch,
     'help':            do_help,
     'version':        do_version,
+    'update':        do_update,
+    'clone':        do_clone,
+    'edman':        do_edman,
 }
 
 
